@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from openai import OpenAI
@@ -8,7 +9,11 @@ from caveman.benchmark.metrics import calculate_sdpt, count_tokens
 from caveman.core.cache import L1Cache
 from caveman.core.compressor import generate_caveman_prose
 from caveman.core.graph import rank_triples_by_importance
+from sentinel.core.source_graph import build_source_graph
+from sentinel.core.verifier import verify_claim
+from sentinel.core.wiki_storage import load_wiki, save_verified_fact
 from shared.extractor import extract_knowledge_triples
+from shared.triple import KnowledgeTriple
 
 
 DATASET: list[dict[str, str]] = [
@@ -87,22 +92,172 @@ DATASET: list[dict[str, str]] = [
 ]
 
 
-def ask_judge(context: str, question: str) -> str:
+def query_l2_memory(keyword: str, caveman_context: str) -> str:
+    tokens = {token.lower() for token in keyword.split() if token.strip()}
+    if not tokens:
+        return ""
+
+    matched_lines = [
+        line.strip()
+        for line in caveman_context.splitlines()
+        if line.strip() and any(token in line.lower() for token in tokens)
+    ]
+    return " ".join(matched_lines)
+
+
+def query_l3_wiki(keyword: str) -> str:
+    tokens = {token.lower() for token in keyword.split() if token.strip()}
+    if not tokens:
+        return ""
+
+    matched_facts: list[str] = []
+    for fact in load_wiki():
+        fact_text = " ".join(
+            [
+                str(fact.get("subject", "")),
+                str(fact.get("verb", "")),
+                str(fact.get("object", "")),
+            ]
+        ).strip()
+        if fact_text and any(token in fact_text.lower() for token in tokens):
+            matched_facts.append(fact_text)
+
+    return " ".join(matched_facts)
+
+
+def _extract_keyword(tool_call) -> str:
+    raw_arguments = getattr(getattr(tool_call, "function", None), "arguments", "")
+    if not raw_arguments:
+        return ""
+
+    try:
+        payload = json.loads(raw_arguments)
+    except json.JSONDecodeError:
+        return ""
+
+    keyword = payload.get("keyword") if isinstance(payload, dict) else ""
+    return str(keyword or "").strip()
+
+
+def ask_judge(caveman_context: str, question: str, source_graph) -> str:
     client = OpenAI()
+    print("\n" + "=" * 100)
+    print("L1 CONTEXT GENERATED")
+    print("=" * 100)
+    print(caveman_context)
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "search_memory",
+                "description": "Searches memory stores when context is insufficient.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "keyword": {
+                            "type": "string",
+                            "description": "Keyword to find in L2 and L3 memory.",
+                        }
+                    },
+                    "required": ["keyword"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+    ]
+
+    conversation: list[dict[str, Any]] = [
+        {
+            "role": "system",
+            "content": "Answer using the Context. If the answer is NOT there, DO NOT GUESS. Use the search_memory tool.",
+        },
+        {
+            "role": "user",
+            "content": f"Context: {caveman_context}\nQuestion: {question}",
+        },
+    ]
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "Answer the question using ONLY the provided context. Keep it brief.",
-            },
-            {
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}",
-            },
-        ],
+        messages=conversation,
+        tools=tools,
     )
-    return (response.choices[0].message.content or "").strip()
+
+    message = response.choices[0].message
+    conversation.append({"role": "assistant", "content": message.content or ""})
+
+    tool_calls = getattr(message, "tool_calls", None)
+    if tool_calls:
+        for tool_call in tool_calls:
+            keyword = _extract_keyword(tool_call)
+            print("\n" + "=" * 100)
+            print("TOOL CALL TRIGGERED")
+            print("=" * 100)
+            print(f"Tool: search_memory | Keyword: {keyword or '<empty>'}")
+
+            l2_result = query_l2_memory(keyword, caveman_context)
+            if l2_result:
+                memory_result = f"L2 HIT: {l2_result}"
+                print("\n" + "=" * 100)
+                print("MEMORY HIT (L2)")
+                print("=" * 100)
+                print(memory_result)
+            else:
+                l3_result = query_l3_wiki(keyword)
+                if l3_result:
+                    memory_result = f"L3 HIT: {l3_result}"
+                    print("\n" + "=" * 100)
+                    print("MEMORY HIT (L3)")
+                    print("=" * 100)
+                    print(memory_result)
+                else:
+                    memory_result = "No matching memory found in L2 or L3."
+                    print("\n" + "=" * 100)
+                    print("MEMORY HIT (L2/L3)")
+                    print("=" * 100)
+                    print(memory_result)
+
+            conversation.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": "search_memory",
+                    "content": memory_result,
+                }
+            )
+
+        final_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=conversation,
+            tools=tools,
+        )
+        final_answer = (final_response.choices[0].message.content or "").strip()
+    else:
+        final_answer = (message.content or "").strip()
+
+    print("\n" + "=" * 100)
+    print("FINAL ANSWER")
+    print("=" * 100)
+    print(final_answer)
+
+    dirty_triples = extract_knowledge_triples(final_answer)
+    print("\n" + "=" * 100)
+    print("SENTINEL VERIFICATION STATUS")
+    print("=" * 100)
+    if not dirty_triples:
+        print("No triples extracted from final answer; nothing to verify.")
+        return final_answer
+
+    for triple in dirty_triples:
+        result = verify_claim(triple, source_graph)
+        if result.is_verified:
+            print(f"✅ CLEAN: [{triple.as_text()}]")
+            save_verified_fact(triple)
+        else:
+            print(f"❌ DIRTY (Hallucination): [{triple.as_text()}]")
+
+    return final_answer
 
 
 def evaluate_accuracy(answer: str, expected: str) -> bool:
@@ -121,6 +276,7 @@ def main() -> int:
 
         triples = extract_knowledge_triples(text)
         ranked_triples = rank_triples_by_importance(triples)
+        source_graph = build_source_graph(triples)
 
         cache = L1Cache(token_budget=30)
         for triple, score in ranked_triples:
@@ -133,7 +289,7 @@ def main() -> int:
         reduction = ((raw_tokens - caveman_tokens) / raw_tokens * 100.0) if raw_tokens else 0.0
         sdpt_value = calculate_sdpt(len(cached_triples), caveman_tokens) if caveman_tokens > 0 else 0.0
 
-        answer = ask_judge(caveman_text, question)
+        answer = ask_judge(caveman_text, question, source_graph)
         is_correct = evaluate_accuracy(answer, expected)
 
         rows.append(

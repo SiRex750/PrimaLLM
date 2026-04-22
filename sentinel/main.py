@@ -29,11 +29,10 @@ def main() -> None:
     print(f"   AI Output: '{ai_response_true}'")
     true_claims = extract_knowledge_triples(ai_response_true)
     for claim in true_claims:
-        claim_text = claim.as_text()
-        print(f"   Claim Extracted: [{claim_text}]")
+        print(f"   Claim Extracted: [{claim.as_text()}]")
         
         # Verify and Save
-        result = verify_claim(claim_text, source_graph)
+        result = verify_claim(claim, source_graph)
         status = "✅ VALID" if result.is_verified else "❌ INVALID"
         print(f"   Result: {status} ({result.reason})")
         
@@ -46,11 +45,10 @@ def main() -> None:
     print(f"   AI Output: '{ai_response_false}'")
     false_claims = extract_knowledge_triples(ai_response_false)
     for claim in false_claims:
-        claim_text = claim.as_text()
-        print(f"   Claim Extracted: [{claim_text}]")
+        print(f"   Claim Extracted: [{claim.as_text()}]")
         
         # Verify and Block
-        result = verify_claim(claim_text, source_graph)
+        result = verify_claim(claim, source_graph)
         status = "✅ VALID" if result.is_verified else "❌ INVALID"
         print(f"   Result: {status} ({result.reason})")
         

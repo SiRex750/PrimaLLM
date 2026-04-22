@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from dataclasses import dataclass
 
 from sentinel.core.source_graph import SourceGraph
+from shared.triple import KnowledgeTriple
 
 
 @dataclass(slots=True)
@@ -13,17 +15,20 @@ class VerificationResult:
     label: str = ""
 
 
-def verify_claim(claim: str, source_graph: SourceGraph, model_name: str = "cross-encoder/nli-deberta-v3-small") -> VerificationResult:
+_STOPWORDS = {"the", "a", "an", "in", "on", "at", "of", "to", "and", "or", "for", "by", "with"}
+
+
+def verify_claim(claim: KnowledgeTriple, source_graph: SourceGraph, model_name: str = "cross-encoder/nli-deberta-v3-small") -> VerificationResult:
     import torch
 
-    premise = " ".join(triple.as_text() for triple in source_graph.triples).strip()
+    premise = _build_localized_premise(claim, source_graph)
     if not premise:
-        return VerificationResult(is_verified=False, reason="No source facts available in the source graph.")
+        return VerificationResult(is_verified=False, reason="No relevant facts found in the source graph context")
 
     tokenizer, model = _load_nli_model(model_name)
     inputs = tokenizer(
         premise,
-        claim,
+        claim.as_text(),
         return_tensors="pt",
         truncation=True,
         padding=True,
@@ -47,6 +52,37 @@ def verify_claim(claim: str, source_graph: SourceGraph, model_name: str = "cross
         reason = "Rejected by local DeBERTa-v3 NLI model: the claim is not entailed by the source graph."
 
     return VerificationResult(is_verified=False, reason=reason, label=label)
+
+
+def _build_localized_premise(claim: KnowledgeTriple, source_graph: SourceGraph) -> str:
+    claim_subject_words = _filtered_words(claim.subject)
+    claim_object_words = _filtered_words(claim.object)
+    claim_text_words = _filtered_words(claim.as_text())
+
+    relevant_triples: list[str] = []
+
+    for triple in source_graph.triples:
+        subject_words = _filtered_words(triple.subject)
+        object_words = _filtered_words(triple.object)
+
+        if (
+            claim_subject_words.intersection(subject_words)
+            or claim_subject_words.intersection(object_words)
+            or claim_object_words.intersection(subject_words)
+            or claim_object_words.intersection(object_words)
+        ):
+            relevant_triples.append(triple.as_text())
+            continue
+
+        source_text_words = _filtered_words(triple.as_text())
+        if claim_text_words.intersection(source_text_words):
+            relevant_triples.append(triple.as_text())
+
+    return " ".join(relevant_triples).strip()
+
+
+def _filtered_words(text: str) -> set[str]:
+    return {word for word in re.findall(r"[A-Za-z0-9]+", text.lower()) if word not in _STOPWORDS}
 
 
 @lru_cache(maxsize=1)
