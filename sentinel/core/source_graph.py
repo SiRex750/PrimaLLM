@@ -13,6 +13,7 @@ class SourceGraph:
     triples: list[KnowledgeTriple]
     graph: nx.DiGraph
     checksums: dict[str, str]
+    master_checksum: str
 
 
 def triple_checksum(triple: KnowledgeTriple) -> str:
@@ -30,4 +31,12 @@ def build_source_graph(triples: list[KnowledgeTriple]) -> SourceGraph:
         graph.add_edge(triple.subject, triple.object, verb=triple.verb, checksum=checksum)
         checksums[triple.as_text()] = checksum
 
-    return SourceGraph(triples=triples, graph=graph, checksums=checksums)
+    master_text = "".join(sorted(triple.as_text() for triple in triples))
+    master_checksum = sha256(master_text.encode("utf-8")).hexdigest()
+
+    return SourceGraph(
+        triples=triples,
+        graph=graph,
+        checksums=checksums,
+        master_checksum=master_checksum,
+    )
