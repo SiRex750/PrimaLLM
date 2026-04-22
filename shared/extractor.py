@@ -57,21 +57,20 @@ def _verb_text(verb_token) -> str:
 
 def _find_object(sent, verb_token) -> str:
     object_token = _select_object_token(sent, verb_token)
-    if object_token is None:
-        return ""
+    collected_tokens = set()
 
-    object_text = _span_text(object_token)
-    prep_phrases = _verb_prepositional_phrases(verb_token)
+    if object_token is not None:
+        collected_tokens.update(getattr(object_token, "subtree", []))
 
-    if not object_text:
-        return " ".join(prep_phrases).strip()
+    if verb_token is not None:
+        for child in getattr(verb_token, "children", []):
+            if child.dep_ == "prep" and any(grandchild.dep_ == "pobj" for grandchild in getattr(child, "children", [])):
+                collected_tokens.update(getattr(child, "subtree", []))
 
-    combined = object_text
-    for phrase in prep_phrases:
-        if phrase and phrase.lower() not in combined.lower():
-            combined = f"{combined} {phrase}".strip()
+            if child.dep_ in {"advcl", "xcomp"}:
+                collected_tokens.update(getattr(child, "subtree", []))
 
-    return combined
+    return _join_tokens_by_index(collected_tokens)
 
 
 def _select_object_token(sent, verb_token):
@@ -95,36 +94,17 @@ def _select_object_token(sent, verb_token):
     return None
 
 
-def _verb_prepositional_phrases(verb_token) -> list[str]:
-    if verb_token is None:
-        return []
-
-    phrases: list[str] = []
-    for child in getattr(verb_token, "children", []):
-        if child.dep_ != "prep":
-            continue
-        if not any(grandchild.dep_ == "pobj" for grandchild in getattr(child, "children", [])):
-            continue
-        phrase = _span_text(child)
-        if phrase:
-            phrases.append(phrase)
-
-    return phrases
-
-
 def _span_text(token) -> str:
-    subtree = getattr(token, "subtree", None)
-    if subtree is not None:
-        try:
-            text = " ".join(node.text for node in subtree).strip()
-            if text:
-                return text
-        except TypeError:
-            text = getattr(subtree, "text", "").strip()
-            if text:
-                return text
+    subtree_tokens = set(getattr(token, "subtree", []))
+    if not subtree_tokens:
+        text = getattr(token, "text", "").strip()
+        return text
+    return _join_tokens_by_index(subtree_tokens)
 
-    return getattr(token, "text", "").strip()
+
+def _join_tokens_by_index(tokens) -> str:
+    ordered = sorted(tokens, key=lambda node: node.i)
+    return " ".join(node.text for node in ordered).strip()
 
 
 def _deduplicate(triples: Iterable[KnowledgeTriple]) -> list[KnowledgeTriple]:
