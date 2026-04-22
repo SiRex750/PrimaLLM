@@ -3,8 +3,12 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Iterable
+import tiktoken
 
 from shared.triple import KnowledgeTriple
+
+
+_ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 @dataclass(slots=True)
@@ -47,7 +51,8 @@ class L1Cache:
 
     def _trim_to_budget(self) -> None:
         while self._estimate_tokens() > self.token_budget and self._entries:
-            self._entries.popitem(last=False)
+            lowest_key = min(self._entries, key=lambda key: self._entries[key].pagerank_score)
+            del self._entries[lowest_key]
 
     def _estimate_tokens(self) -> int:
-        return sum(len(text.split()) for text in self._entries)
+        return sum(len(_ENCODING.encode(text)) for text in self._entries)

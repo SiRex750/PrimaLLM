@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from typing import Iterable
+import networkx as nx
 
 from shared.triple import KnowledgeTriple
 
 
 def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.DiGraph:
-    import networkx as nx
-
     graph = nx.DiGraph()
     for triple in triples:
         graph.add_node(triple.subject)
@@ -17,8 +16,6 @@ def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.DiGraph:
 
 
 def pagerank_scores(graph: nx.DiGraph) -> dict[str, float]:
-    import networkx as nx
-
     if graph.number_of_nodes() == 0:
         return {}
     return nx.pagerank(graph)

@@ -1,2 +1,7 @@
 spacy
 networkx
+tiktoken
+openai
+transformers
+torch
+python-dotenv
