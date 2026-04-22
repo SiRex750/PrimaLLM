@@ -14,3 +14,7 @@ def sdpt(unique_acus_preserved: float, compressed_token_count: int) -> float:
     if compressed_token_count <= 0:
         raise ValueError("compressed_token_count must be positive.")
     return unique_acus_preserved / compressed_token_count
+
+
+def calculate_sdpt(unique_acus_preserved: float, compressed_token_count: int) -> float:
+    return sdpt(unique_acus_preserved, compressed_token_count)
