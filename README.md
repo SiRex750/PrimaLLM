@@ -1,55 +1,44 @@
 # PrimaLLM
 
-PrimaLLM is a small LLM memory architecture prototype that:
+PrimaLLM is now organized as a two-path research repo:
 
-- extracts subject-verb-object facts from text
-- verifies claims against trusted context
-- stores verified facts in a JSON wiki layer
-- loads verified facts into an L1 cache for live chat use
+- `shared/` contains the local spaCy triple extractor and `KnowledgeTriple`
+- `caveman/` contains Path A compression, PageRank scoring, and L1 caching
+- `sentinel/` contains Path B verification, source graphs, and L3 persistence
 
-## Project Files
+## Current Layout
 
-- `main.py` - main chat orchestrator
-- `caveman.py` - knowledge graph extraction
-- `verification_layer.py` - claim verification with NLI
-- `memory_manager.py` - token-budgeted L1 cache
-- `wiki_storage.py` - persistent JSON storage for verified facts
-- `karpathy_wiki.json` - local fact store
+- `shared/extractor.py` - single source of truth for spaCy SVO extraction
+- `shared/triple.py` - shared `KnowledgeTriple` dataclass
+- `caveman/main.py` - local compression demo entry point
+- `caveman/core/graph.py` - NetworkX graph and PageRank scoring
+- `caveman/core/cache.py` - token-budgeted L1 cache
+- `sentinel/core/source_graph.py` - source-of-truth graph construction
+- `sentinel/core/verifier.py` - deterministic NLI verification
+- `sentinel/core/wiki_storage.py` - L3 JSON persistence
+- `sentinel/core/wiki.json` - local verified fact store
 
 ## Setup
 
-1. Create a local `.env` file in the project root.
-2. Add your OpenAI key:
+1. Create a local `.env` file in the project root if you need model downloads or external services.
+2. Install the package dependencies required by the path you are working on.
+3. For extraction, make sure `en_core_web_sm` is installed in your spaCy environment.
 
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
+## Run
 
-3. Install dependencies inside the virtual environment if needed:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install openai matplotlib networkx tiktoken python-dotenv
-```
-
-## Run the Chat App
-
-Start the interactive loop:
+Path A demo:
 
 ```powershell
-Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
-.\.venv\Scripts\python.exe .\main.py
+.\.venv\Scripts\python.exe -m caveman.main
 ```
 
-Type your message at the `User:` prompt. Type `exit` to quit.
+Path B benchmark scaffold:
 
-## How It Works
-
-1. `main.py` loads verified facts from `karpathy_wiki.json` into the L1 cache.
-2. User input is sent to the chat model.
-3. The response is extracted into knowledge triples.
-4. Each triple is verified against the current cache context.
-5. Verified facts are saved back to JSON and added to the cache.
+```powershell
+.\.venv\Scripts\python.exe -m sentinel.benchmark.run_verification_benchmark
+```
 
 ## Notes
 
-- The repository contains a knowledge-graph image output at `knowledge_graph.png` from earlier runs.
+- The legacy root-level prototype files have been retired in favor of the package layout.
+- Sentinel owns the JSON store now; the default file lives at `sentinel/core/wiki.json`.
