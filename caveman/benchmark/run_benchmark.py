@@ -278,7 +278,7 @@ def main() -> int:
         ranked_triples = rank_triples_by_importance(triples)
         source_graph = build_source_graph(triples)
 
-        cache = L1Cache(token_budget=30)
+        cache = L1Cache(budgets={"facts": 30})
         for triple, score in ranked_triples:
             cache.add_fact(triple, pagerank_score=score)
 

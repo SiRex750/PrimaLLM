@@ -28,7 +28,7 @@ def main(filename: str = "source_material.txt") -> None:
     triples = extract_knowledge_triples(source_text)
     ranked_triples = rank_triples_by_importance(triples)
 
-    cache = L1Cache(token_budget=50)
+    cache = L1Cache(budgets={"facts": 50})
     for triple, score in ranked_triples:
         cache.add_fact(triple, pagerank_score=score)
 

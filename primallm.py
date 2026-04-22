@@ -69,7 +69,7 @@ def main() -> None:
         print(f"  - {triple.as_text()}")
 
     _banner("STEP 2 - L1 CAVEMAN")
-    l1_cache = L1Cache(token_budget=15)
+    l1_cache = L1Cache(budgets={"facts": 15})
     ranked = rank_triples_by_importance(source_triples)
     for triple, score in ranked:
         l1_cache.add_fact(triple, pagerank_score=score)
