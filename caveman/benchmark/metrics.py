@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import tiktoken
+
+
+_ENCODING = tiktoken.get_encoding("cl100k_base")
+
 
 def count_tokens(text: str) -> int:
-    return len(text.split())
+    return len(_ENCODING.encode(text))
 
 
-def sdpt(raw_accuracy: float, compressed_accuracy: float, raw_tokens: int, compressed_tokens: int) -> float:
-    if raw_tokens <= 0 or compressed_tokens <= 0:
-        raise ValueError("Token counts must be positive.")
-    delta_accuracy = compressed_accuracy - raw_accuracy
-    delta_tokens = raw_tokens - compressed_tokens
-    return delta_accuracy / delta_tokens if delta_tokens else 0.0
+def sdpt(unique_acus_preserved: float, compressed_token_count: int) -> float:
+    if compressed_token_count <= 0:
+        raise ValueError("compressed_token_count must be positive.")
+    return unique_acus_preserved / compressed_token_count

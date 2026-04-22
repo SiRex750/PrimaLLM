@@ -27,5 +27,12 @@ def save_verified_fact(
 
     triple = subject if isinstance(subject, KnowledgeTriple) else KnowledgeTriple(subject, verb or "", object or "")
     existing = load_wiki(path)
+    if any(
+        fact.get("subject") == triple.subject
+        and fact.get("verb") == triple.verb
+        and fact.get("object") == triple.object
+        for fact in existing
+    ):
+        return
     existing.append({"subject": triple.subject, "verb": triple.verb, "object": triple.object})
     path.write_text(json.dumps(existing, indent=2, ensure_ascii=True), encoding="utf-8")

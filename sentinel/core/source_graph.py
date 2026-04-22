@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 
+import networkx as nx
+
 from shared.triple import KnowledgeTriple
 
 
@@ -18,8 +20,6 @@ def triple_checksum(triple: KnowledgeTriple) -> str:
 
 
 def build_source_graph(triples: list[KnowledgeTriple]) -> SourceGraph:
-    import networkx as nx
-
     graph = nx.DiGraph()
     checksums: dict[str, str] = {}
 
