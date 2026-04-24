@@ -20,14 +20,21 @@ def triple_checksum(triple: KnowledgeTriple) -> str:
     return sha256(triple.as_text().encode("utf-8")).hexdigest()
 
 
-def build_source_graph(triples: list[KnowledgeTriple]) -> SourceGraph:
+def build_source_graph(triples: list[KnowledgeTriple], embedder=None) -> SourceGraph:
     graph = nx.DiGraph()
     checksums: dict[str, str] = {}
 
     for triple in triples:
         checksum = triple_checksum(triple)
-        graph.add_node(triple.subject, checksum=checksum)
-        graph.add_node(triple.object, checksum=checksum)
+        
+        if not graph.has_node(triple.subject):
+            v_subj = embedder.encode(triple.subject) if embedder else None
+            graph.add_node(triple.subject, checksum=checksum, vector=v_subj)
+            
+        if not graph.has_node(triple.object):
+            v_obj = embedder.encode(triple.object) if embedder else None
+            graph.add_node(triple.object, checksum=checksum, vector=v_obj)
+            
         graph.add_edge(triple.subject, triple.object, verb=triple.verb, checksum=checksum)
         checksums[triple.as_text()] = checksum
 
