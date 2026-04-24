@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from openai import OpenAI
+import ollama
 
 from caveman.benchmark.metrics import calculate_sdpt, count_tokens
 from caveman.core.cache import L1Cache
@@ -92,17 +92,49 @@ DATASET: list[dict[str, str]] = [
 ]
 
 
-def query_l2_memory(keyword: str, caveman_context: str) -> str:
-    tokens = {token.lower() for token in keyword.split() if token.strip()}
-    if not tokens:
+from app import get_embedder
+from sklearn.metrics.pairwise import cosine_similarity
+
+def query_l2_memory(keyword: str, source_graph) -> str:
+    if source_graph is None or not keyword:
         return ""
 
-    matched_lines = [
-        line.strip()
-        for line in caveman_context.splitlines()
-        if line.strip() and any(token in line.lower() for token in tokens)
-    ]
-    return " ".join(matched_lines)
+    embedder = get_embedder()
+    keyword_vector = embedder.encode(keyword)
+    graph = source_graph.graph
+
+    best_node = None
+    best_score = -1.0
+
+    for node, data in graph.nodes(data=True):
+        if "vector" in data and data["vector"] is not None:
+            node_vector = data["vector"]
+            sim = cosine_similarity([keyword_vector], [node_vector])[0][0]
+            if sim > best_score:
+                best_score = sim
+                best_node = node
+
+    if best_score < 0.60 or best_node is None:
+        return ""
+
+    edge_lines: list[str] = []
+    seen_edges: set[tuple[str, str, str]] = set()
+
+    for subject, obj, data in graph.out_edges(best_node, data=True):
+        verb = str((data or {}).get("verb", "")).strip()
+        edge_key = (str(subject), verb, str(obj))
+        if edge_key not in seen_edges:
+            seen_edges.add(edge_key)
+            edge_lines.append(f"{subject} {verb} {obj}".strip())
+
+    for subject, obj, data in graph.in_edges(best_node, data=True):
+        verb = str((data or {}).get("verb", "")).strip()
+        edge_key = (str(subject), verb, str(obj))
+        if edge_key not in seen_edges:
+            seen_edges.add(edge_key)
+            edge_lines.append(f"{subject} {verb} {obj}".strip())
+
+    return " | ".join(edge_lines)
 
 
 def query_l3_wiki(keyword: str) -> str:
@@ -140,37 +172,29 @@ def _extract_keyword(tool_call) -> str:
 
 
 def ask_judge(caveman_context: str, question: str, source_graph) -> str:
-    client = OpenAI()
     print("\n" + "=" * 100)
     print("L1 CONTEXT GENERATED")
     print("=" * 100)
     print(caveman_context)
 
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "search_memory",
-                "description": "Searches memory stores when context is insufficient.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "keyword": {
-                            "type": "string",
-                            "description": "Keyword to find in L2 and L3 memory.",
-                        }
-                    },
-                    "required": ["keyword"],
-                    "additionalProperties": False,
-                },
-            },
-        }
-    ]
+    SYSTEM_INSTRUCTION = """You are the NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. You do not converse. You do not explain your thoughts. 
+
+You have two operating modes. You must output ONLY ONE of the following:
+
+MODE 1: CACHE HIT (Answer Synthesis)
+If the L1 Cache (Context) contains the answer to the user's query, output the final answer directly.
+
+MODE 2: CACHE MISS (Memory Fault)
+If the answer is NOT in the L1 Cache, you MUST trigger an L2 Page Fault by outputting STRICTLY a JSON object matching this schema. Do not output any text before or after the JSON:
+{
+    "tool": "search_memory",
+    "keyword": "exact_semantic_keyword_to_search"
+}"""
 
     conversation: list[dict[str, Any]] = [
         {
             "role": "system",
-            "content": "Answer using the Context. If the answer is NOT there, DO NOT GUESS. Use the search_memory tool.",
+            "content": SYSTEM_INSTRUCTION,
         },
         {
             "role": "user",
@@ -178,41 +202,19 @@ def ask_judge(caveman_context: str, question: str, source_graph) -> str:
         },
     ]
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=conversation,
-        tools=tools,
-    )
+    response = ollama.chat(model='qwen2.5:1.5b', messages=conversation)
+    content = response.get('message', {}).get('content', '').strip()
 
-    message = response.choices[0].message
-    tool_calls = getattr(message, "tool_calls", None)
-    if tool_calls:
-        conversation.append(
-            {
-                "role": "assistant",
-                "content": message.content or "",
-                "tool_calls": [
-                    {
-                        "id": tool_call.id,
-                        "type": tool_call.type,
-                        "function": {
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments,
-                        },
-                    }
-                    for tool_call in tool_calls
-                ],
-            }
-        )
-
-        for tool_call in tool_calls:
-            keyword = _extract_keyword(tool_call)
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict) and parsed.get("tool") == "search_memory":
+            keyword = str(parsed.get("keyword", "")).strip()
             print("\n" + "=" * 100)
             print("TOOL CALL TRIGGERED")
             print("=" * 100)
             print(f"Tool: search_memory | Keyword: {keyword or '<empty>'}")
 
-            l2_result = query_l2_memory(keyword, caveman_context)
+            l2_result = query_l2_memory(keyword, source_graph)
             if l2_result:
                 memory_result = f"L2 HIT: {l2_result}"
                 print("\n" + "=" * 100)
@@ -234,23 +236,15 @@ def ask_judge(caveman_context: str, question: str, source_graph) -> str:
                     print("=" * 100)
                     print(memory_result)
 
-            conversation.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": "search_memory",
-                    "content": memory_result,
-                }
-            )
+            conversation.append({"role": "assistant", "content": content})
+            conversation.append({"role": "user", "content": f"TOOL RESULT: {memory_result}"})
 
-        final_response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=conversation,
-            tools=tools,
-        )
-        final_answer = (final_response.choices[0].message.content or "").strip()
-    else:
-        final_answer = (message.content or "").strip()
+            final_response = ollama.chat(model='qwen2.5:1.5b', messages=conversation)
+            final_answer = final_response.get('message', {}).get('content', '').strip()
+        else:
+            final_answer = content
+    except json.JSONDecodeError:
+        final_answer = content
 
     print("\n" + "=" * 100)
     print("FINAL ANSWER")
@@ -292,7 +286,7 @@ def main() -> int:
 
         triples = extract_knowledge_triples(text)
         ranked_triples = rank_triples_by_importance(triples)
-        source_graph = build_source_graph(triples)
+        source_graph = build_source_graph(triples, embedder=get_embedder())
 
         cache = L1Cache(budgets={"facts": 30})
         for triple, score in ranked_triples:
