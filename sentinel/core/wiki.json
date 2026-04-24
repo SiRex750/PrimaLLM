@@ -3,5 +3,40 @@
     "subject": "Neil Armstrong and Buzz Aldrin",
     "verb": "descend",
     "object": "to the lunar surface in the Eagle module"
+  },
+  {
+    "subject": "An apple tree",
+    "verb": "classify",
+    "object": "as Malus spp"
+  },
+  {
+    "subject": "The cell",
+    "verb": "generate",
+    "object": "ATP through a process called oxidative phosphorylation , which occurs in the mitochondria"
+  },
+  {
+    "subject": "Caesar",
+    "verb": "cross",
+    "object": "the Rubicon River"
+  },
+  {
+    "subject": "The Data Center segment",
+    "verb": "generate",
+    "object": "$ 22 billion in sales"
+  },
+  {
+    "subject": "Michael Collins",
+    "verb": "remain",
+    "object": "in lunar orbit"
+  },
+  {
+    "subject": "The central bank",
+    "verb": "raise",
+    "object": "interest rates by 50 basis points to fight rising inflation"
+  },
+  {
+    "subject": "The provided context",
+    "verb": "specify",
+    "object": "the mechanism Transformers use to process data"
   }
 ]

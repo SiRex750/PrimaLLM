@@ -185,10 +185,26 @@ def ask_judge(caveman_context: str, question: str, source_graph) -> str:
     )
 
     message = response.choices[0].message
-    conversation.append({"role": "assistant", "content": message.content or ""})
-
     tool_calls = getattr(message, "tool_calls", None)
     if tool_calls:
+        conversation.append(
+            {
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments,
+                        },
+                    }
+                    for tool_call in tool_calls
+                ],
+            }
+        )
+
         for tool_call in tool_calls:
             keyword = _extract_keyword(tool_call)
             print("\n" + "=" * 100)
@@ -305,20 +321,20 @@ def main() -> int:
             }
         )
 
-    print("=" * 90)
+    print("=" * 106)
     print("CAVEMAN BENCHMARK REPORT")
-    print("=" * 90)
+    print("=" * 106)
     print(
-        f"{'Case':<4} {'Raw Tokens':>11} {'Caveman Tokens':>15} {'Reduction %':>12} {'SDpT':>10} {'Accuracy':>10}"
+        f"{'Case':<4} {'Raw Tokens':>11} {'Caveman Tokens':>15} {'Reduction %':>12} {'SDpT (Lower Better)':>20} {'Accuracy':>10}"
     )
-    print("-" * 90)
+    print("-" * 106)
     for index, row in enumerate(rows, start=1):
         accuracy_label = "PASS" if row["accuracy"] else "FAIL"
         print(
             f"{index:<4} {row['raw_tokens']:>11} {row['caveman_tokens']:>15} "
-            f"{row['reduction']:>11.2f}% {row['sdpt']:>10.4f} {accuracy_label:>10}"
+            f"{row['reduction']:>11.2f}% {row['sdpt']:>20.4f} {accuracy_label:>10}"
         )
-    print("-" * 90)
+    print("-" * 106)
     for index, row in enumerate(rows, start=1):
         print(f"Case {index}: {row['question']}")
         print(f"  Expected: {row['expected']}")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 
 from openai import OpenAI
@@ -31,16 +32,43 @@ def _banner(title: str) -> None:
 
 
 def query_l2_memory(keyword: str, source_graph) -> str:
-    keywords = [word for word in keyword.lower().split() if len(word) > 3]
+    if source_graph is None:
+        return ""
+
+    keywords = [word for word in re.findall(r"[A-Za-z0-9]+", keyword.lower()) if len(word) > 3]
     if not keywords:
         return ""
 
-    for triple in source_graph.triples:
-        triple_text = triple.as_text()
-        lowered_triple_text = triple_text.lower()
-        if any(term in lowered_triple_text for term in keywords):
-            return triple_text
-    return ""
+    graph = source_graph.graph
+    matching_nodes = [
+        node
+        for node in graph.nodes
+        if any(term in str(node).lower() for term in keywords)
+    ]
+    if not matching_nodes:
+        return ""
+
+    edge_lines: list[str] = []
+    seen_edges: set[tuple[str, str, str]] = set()
+
+    for node in matching_nodes:
+        for subject, obj, data in graph.out_edges(node, data=True):
+            verb = str((data or {}).get("verb", "")).strip()
+            edge_key = (str(subject), verb, str(obj))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            edge_lines.append(f"{subject} {verb} {obj}".strip())
+
+        for subject, obj, data in graph.in_edges(node, data=True):
+            verb = str((data or {}).get("verb", "")).strip()
+            edge_key = (str(subject), verb, str(obj))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            edge_lines.append(f"{subject} {verb} {obj}".strip())
+
+    return " | ".join(edge_lines)
 
 
 def query_l3_wiki(keyword: str) -> str:
