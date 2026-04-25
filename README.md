@@ -1,118 +1,129 @@
 # PrimaLLM
 
-PrimaLLM is a local-first research codebase for factual compression and factual verification.
+A Local-First Neural Memory Management Unit for Verifiable Knowledge Compression and Factual Grounding.
 
-It is intentionally split into two paths:
+This research project was developed by a 2nd-year CSE (AI/ML) student at PES University to explore the intersection of graph-based knowledge compression and NLI-driven factual verification.
 
-- Path A (Caveman): compress source knowledge into a compact context layer.
-- Path B (Sentinel): verify claims against a source-of-truth graph before persistence.
+## What is PrimaLLM?
 
-## Design Goals
+PrimaLLM is a research-oriented Neural Memory Management Unit (NMMU) designed to address context window saturation and hallucination in Large Language Models. It implements a dual-path architecture: **Caveman** for graph-based factual compression and **Sentinel** for NLI-based claim verification. The system provides an end-to-end local pipeline for managing long-term semantic memory, ensuring that only verified information is persisted to long-term storage while maintaining high semantic density in the active context.
 
-- Keep extraction local and deterministic with GLiNER (`gliner-relex-large-v0.5`).
-- Keep verification local and deterministic with DeBERTa NLI (`cross-encoder/nli-deberta-v3-small`).
-- Share core data structures and extraction logic through `shared/`.
-- Avoid verification against prior AI output; verify against ingested source facts.
+## Architecture Overview
+
+PrimaLLM operates on a three-tier memory hierarchy inspired by operating system cache architectures:
+
+- **L1 (Cache)**: A set-associative context window with strictly enforced token budgets for System instructions, Facts, History, Tools, and unverified Scratch content.
+- **L2 (RAM)**: A semantic vector space for mid-term retrieval using high-fidelity knowledge triples and PageRank-weighted importance scoring.
+- **L3 (Disk)**: A verified persistent wiki storage (SQLite) containing only facts that have passed the Sentinel NLI verification gate.
+
+## Benchmark Results
+
+### CAVEMAN (8-case QA benchmark)
+
+| Metric | Value |
+| :--- | :--- |
+| Overall accuracy | 75.0% |
+| Average token reduction | 42.1% |
+| Average baseline SDpT | 14.58 tokens/ACU |
+| Average Caveman SDpT | 8.90 tokens/ACU |
+| Average SDpT improvement | 5.69 tokens/ACU |
+| Model used | qwen2.5:1.5b (local, no API) |
+| Extractor | spaCy (source documents) + GLiNER-relex (claims) |
+
+### SENTINEL (30-case Apple Wikipedia benchmark)
+
+| Metric | Value |
+| :--- | :--- |
+| Overall accuracy | 63.3% |
+| Precision | 63.6% |
+| Recall | 50.0% |
+| F1 Score | 0.56 |
+| TP/TN/FP/FN | 7/12/4/7 |
+| History domain | 4/4 (100%) |
+| Botany domain | 11/17 (65%) |
+| Easy cases | 8/11 (73%) |
+| Hard cases | 4/5 (80%) |
+| Edge cases | 1/4 (25%) |
+| NLI model | cross-encoder/nli-deberta-v3-small (142M params, local) |
 
 ## Repository Structure
 
-- `shared/`
-- `shared/triple.py`: shared `KnowledgeTriple` dataclass.
-- `shared/extractor.py`: single extraction implementation for both paths.
-- `caveman/`
-- `caveman/main.py`: end-to-end compression demo entrypoint.
-- `caveman/core/graph.py`: directed graph + PageRank ranking.
-- `caveman/core/cache.py`: token-budget L1 cache with eviction.
-- `caveman/core/compressor.py`: compressed prose generation (OpenAI or local Qwen).
-- `caveman/benchmark/`: benchmark scaffold for compression experiments.
-- `sentinel/`
-- `sentinel/main.py`: end-to-end verification demo entrypoint.
-- `sentinel/core/source_graph.py`: source graph + per-triple and master checksums.
-- `sentinel/core/verifier.py`: local NLI verification logic.
-- `sentinel/core/wiki_storage.py`: JSON persistence for verified facts.
-- `sentinel/benchmark/`: benchmark scaffold for verification experiments.
+- `shared/` — Core `KnowledgeTriple` dataclass, dual extractor (spaCy + GLiNER-relex), and L3 SQLite memory interfaces.
+- `caveman/` — Factual graph compression pipeline including `graph.py`, `cache.py`, `compressor.py`, and the compression benchmark suite.
+- `sentinel/` — NLI-based verification pipeline featuring `source_graph.py`, `verifier.py`, `wiki_storage.py`, and the Sentinel benchmark suite.
+- `benchmarks/` — Directory containing saved JSON results and logs for both system components.
+- `app.py` — Streamlit-based web interface featuring live PyVis knowledge graph visualisations.
+- `primallm.py` — Command-line entrypoint for the complete end-to-end NMMU pipeline.
 
-## Prerequisites
+## Installation
 
-- Python 3.10+ recommended.
-- A virtual environment.
-- For Caveman OpenAI mode only: `OPENAI_API_KEY` in `.env`.
-
-Install dependencies:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r caveman\requirements.txt
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
 
-Install GLiNER:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install gliner
-```
-
-Optional environment file:
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
+*Note: The first execution will download GLiNER and DeBERTa model weights (~500MB total).*
 
 ## Quick Start
 
-Run Caveman (Path A):
-
-```powershell
-.\.venv\Scripts\python.exe -m caveman.main
+### Streamlit UI
+```bash
+$env:PYTHONPATH="."; .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Run Caveman with local SLM generation:
-
-```powershell
-$env:USE_LOCAL_SLM="true"; .\.venv\Scripts\python.exe -m caveman.main
+### CLI Pipeline
+```bash
+$env:PYTHONPATH="."; .\.venv\Scripts\python.exe primallm.py
 ```
 
-Run Sentinel (Path B):
-
-```powershell
-.\.venv\Scripts\python.exe -m sentinel.main
+### Caveman Benchmark
+```bash
+$env:PYTHONPATH="."; .\.venv\Scripts\python.exe -m caveman.benchmark.run_benchmark
 ```
 
-Run benchmark scaffolds:
-
-```powershell
-.\.venv\Scripts\python.exe -m caveman.benchmark.run_benchmark
-.\.venv\Scripts\python.exe -m sentinel.benchmark.run_verification_benchmark
+### Sentinel Benchmark
+```bash
+$env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 ```
 
 ## How It Works
 
-1. `shared/extractor.py` converts raw text into `(subject, verb, object)` triples.
-2. Caveman ranks triples with PageRank and trims them to a token budget.
-3. Caveman generates compact prose from retained triples.
-4. Sentinel builds a source graph and computes:
-- per-triple SHA-256 checksums
-- a master SHA-256 checksum from sorted triple text
-5. Sentinel runs local NLI to accept or reject claims.
-6. Verified claims are persisted through `sentinel/core/wiki_storage.py`.
+1. **Extraction**: LiteParse or PyPDF2 extracts clean text from uploaded PDF documents.
+2. **Graph Construction**: A spaCy-based SVO (Subject-Verb-Object) extractor builds a source `KnowledgeTriple` set, which is converted into a NetworkX graph for PageRank-based importance scoring.
+3. **Compression**: The Caveman pipeline selects the top-ranked triples and enforces an L1 token budget using a set-associative cache (SYSTEM/FACTS/HISTORY/TOOLS/SCRATCH). It then generates compressed prose via a local Ollama Small Language Model (SLM).
+4. **Inference**: A local LLM (e.g., Phi-3 or Qwen-2.5 via Ollama) answers the user query using the compressed context.
+5. **Claim Extraction**: The LLM output is added to the SCRATCH set (marked as "dirty"). GLiNER-relex extracts claim triples directly from this generated output.
+6. **Verification**: The Sentinel NLI gate verifies each dirty triple against the original source graph. CLEAN triples are promoted to L3 SQLite storage, while DIRTY triples (hallucinations) are discarded.
 
-## Example Flow
+## Design Principles
 
-Sentinel demo output includes lines like:
+- **Local-first**: All models run on consumer-grade hardware; no external APIs or cloud dependencies are required.
+- **Privacy-preserving**: Sensitive documents never leave the local environment during processing or inference.
+- **Verified persistence**: Implementation of a strict write-back policy where no data enters long-term memory without NLI confirmation.
+- **OS-inspired**: The LLM context window is managed as a hardware cache hierarchy (L1/L2/L3) with explicit eviction policies.
 
-```text
---- SENTINEL VERIFICATION ORACLE ---
-1. Extracting Source Graph (Semantic Checksum)...
-	Nodes: 6 | Edges: 3
-	Master Checksum (SHA-256): 08f8c85e6d9e5063...
-...
-	Result: ✅ VALID (...)
-...
-	Result: ❌ INVALID (...)
-```
+## Tech Stack
 
-This demonstrates the intended guardrail behavior: accepted claims are persisted, rejected claims are blocked.
+- **spaCy (en_core_web_sm)**: Source triple extraction and NLP preprocessing.
+- **GLiNER-relex (knowledgator/gliner-relex-large-v0.5)**: High-precision claim triple extraction from LLM responses.
+- **DeBERTa (cross-encoder/nli-deberta-v3-small)**: Local NLI verification for the Sentinel gate.
+- **NetworkX**: Knowledge graph representation and PageRank algorithmic scoring.
+- **tiktoken**: Precise token budget enforcement for context management.
+- **SQLite (WAL mode)**: High-performance storage for L3 verified fact persistence.
+- **sentence-transformers (all-MiniLM-L6-v2)**: L2 semantic search and embedding generation.
+- **PyVis**: Interactive knowledge graph visualisation.
+- **Streamlit**: Web-based user interface.
+- **Ollama (qwen2.5:1.5b or phi-3-mini)**: Local SLM/LLM inference.
 
-## Notes
+## Citation / Academic Context
 
-- `sentinel/core/wiki.json` is runtime persistence and can be recreated automatically.
-- First run may download local model artifacts (GLiNER, transformers models).
-- If Hugging Face warns about unauthenticated requests, setting `HF_TOKEN` is optional but can improve download limits.
+If you use PrimaLLM in academic work, please cite the following works that inspired this architecture:
+
+- Lewis et al. (2020) Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+- Packer et al. (2023) MemGPT: Towards LLMs as Operating Systems
+- Jiang et al. (2023) LLMLingua: Compressing Prompts for Accelerated Inference of Large Language Models
+- Laban et al. (2022) SummaC: Re-Visiting NLI-based Models for Inconsistency Detection in Summarization
+- Liu et al. (2023) Lost in the Middle: How Language Models Use Long Contexts
