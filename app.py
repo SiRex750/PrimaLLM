@@ -313,20 +313,29 @@ def query_l2_memory(keyword: str, source_graph) -> str:
 
 
 def query_l3_wiki(keyword: str) -> str:
-    keywords = [word for word in keyword.lower().split() if len(word) > 2]
-    if not keywords:
+    from shared.l3_memory import fetch_clean_facts_by_similarity
+    embedder = get_embedder()
+
+    results = fetch_clean_facts_by_similarity(
+        keyword=keyword,
+        embedder=embedder,
+        threshold=0.55,
+        limit=3
+    )
+
+    if not results:
         return ""
 
-    for fact in fetch_clean_facts():
+    lines = []
+    for fact in results:
         triple_text = (
-            f"{fact.get('subject', '')} {fact.get('verb', '')} {fact.get('object', '')}".strip()
+            f"{fact['subject']} {fact['verb']} {fact['object']}".strip()
         )
-        lowered_triple_text = triple_text.lower()
-        if any(term in lowered_triple_text for term in keywords):
-            source_page = int(fact.get("source_page") or 0)
-            citation = f" (source_page={source_page})" if source_page > 0 else ""
-            return f"{triple_text}{citation}"
-    return ""
+        source_page = int(fact.get("source_page") or 0)
+        citation = f" (source_page={source_page})" if source_page > 0 else ""
+        lines.append(f"{triple_text}{citation}")
+
+    return " | ".join(lines)
 
 
 def process_pdf(file) -> tuple[int, int]:

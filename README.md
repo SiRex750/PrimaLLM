@@ -9,7 +9,7 @@ It is intentionally split into two paths:
 
 ## Design Goals
 
-- Keep extraction local and deterministic with spaCy (`en_core_web_sm`).
+- Keep extraction local and deterministic with GLiNER (`gliner-relex-large-v0.5`).
 - Keep verification local and deterministic with DeBERTa NLI (`cross-encoder/nli-deberta-v3-small`).
 - Share core data structures and extraction logic through `shared/`.
 - Avoid verification against prior AI output; verify against ingested source facts.
@@ -44,10 +44,10 @@ Install dependencies:
 .\.venv\Scripts\python.exe -m pip install -r caveman\requirements.txt
 ```
 
-Install spaCy English model:
+Install GLiNER:
 
 ```powershell
-.\.venv\Scripts\python.exe -m spacy download en_core_web_sm
+.\.venv\Scripts\python.exe -m pip install gliner
 ```
 
 Optional environment file:
@@ -114,5 +114,5 @@ This demonstrates the intended guardrail behavior: accepted claims are persisted
 ## Notes
 
 - `sentinel/core/wiki.json` is runtime persistence and can be recreated automatically.
-- First run may download local model artifacts (spaCy, transformers models).
+- First run may download local model artifacts (GLiNER, transformers models).
 - If Hugging Face warns about unauthenticated requests, setting `HF_TOKEN` is optional but can improve download limits.

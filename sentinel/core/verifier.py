@@ -20,6 +20,7 @@ _STOPWORDS = {"the", "a", "an", "in", "on", "at", "of", "to", "and", "or", "for"
 
 def verify_claim(claim: KnowledgeTriple, source_graph: SourceGraph, model_name: str = "cross-encoder/nli-deberta-v3-small") -> VerificationResult:
     import torch
+    import torch.nn.functional as F
 
     premise = _build_localized_premise(claim, source_graph)
     if not premise:
@@ -39,6 +40,19 @@ def verify_claim(claim: KnowledgeTriple, source_graph: SourceGraph, model_name: 
         prediction = int(torch.argmax(outputs.logits, dim=-1).item())
 
     label = _resolve_label(model, prediction)
+
+    if not claim.is_deterministic and label == "entailment":
+        probs = F.softmax(outputs.logits, dim=-1)
+        entailment_idx = [i for i, l in model.config.id2label.items() if "entail" in l.lower()][0]
+        entailment_score = probs[0][entailment_idx].item()
+
+        if entailment_score <= 0.85:
+            return VerificationResult(
+                is_verified=False,
+                reason="GLiNER-extracted triple requires higher confidence threshold",
+                label="neutral"
+            )
+
     if label == "entailment":
         return VerificationResult(
             is_verified=True,

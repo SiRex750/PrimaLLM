@@ -186,3 +186,42 @@ def _normalize_source_page(raw_value: Any) -> int:
         return 0
 
     return page_number if page_number >= 0 else 0
+
+
+def fetch_clean_facts_by_similarity(
+    keyword: str,
+    embedder,
+    threshold: float = 0.60,
+    limit: int = 5,
+) -> list[dict]:
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    # 1. Load all CLEAN facts
+    facts = fetch_clean_facts()
+    if not facts:
+        return []
+
+    # 2. Build fact strings
+    fact_strings = [f"{f['subject']} {f['verb']} {f['object']}" for f in facts]
+
+    # 3. Batch encode fact strings
+    fact_vectors = embedder.encode(fact_strings)
+
+    # 4. Encode keyword
+    keyword_vector = embedder.encode(keyword)
+
+    # 5. Compute cosine similarity
+    scores = cosine_similarity([keyword_vector], fact_vectors)[0]
+
+    # 6. Filter and attach scores
+    scored_facts = []
+    for i, score in enumerate(scores):
+        val = float(score)
+        if val >= threshold:
+            fact = dict(facts[i])
+            fact["similarity_score"] = val
+            scored_facts.append(fact)
+
+    # 7. Sort by score descending and limit
+    scored_facts.sort(key=lambda x: x["similarity_score"], reverse=True)
+    return scored_facts[:limit]
