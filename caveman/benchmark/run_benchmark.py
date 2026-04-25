@@ -251,21 +251,33 @@ If the answer is NOT in the L1 Cache, you MUST trigger an L2 Page Fault by outpu
     print("=" * 100)
     print(final_answer)
 
+    # Step 1: Add LLM answer to SCRATCH (dirty content)
+    # In the benchmark we don't have a live cache object,
+    # so we simulate the SCRATCH flush directly.
+    dirty_entries = [final_answer]
+    
+    # Step 2: Extract claim triples from dirty SCRATCH content
+    # Use extract_claim_triples (GLiNER) for LLM output,
+    # not extract_source_triples (spaCy) which is for source docs
+    from shared.extractor import extract_claim_triples
     dirty_triples = extract_claim_triples(final_answer)
+    
     print("\n" + "=" * 100)
-    print("SENTINEL VERIFICATION STATUS")
+    print("SENTINEL WRITE-BACK GATE (SCRATCH FLUSH)")
     print("=" * 100)
+    
     if not dirty_triples:
-        print("No triples extracted from final answer; nothing to verify.")
+        print("No verifiable triples extracted from SCRATCH content.")
         return final_answer
-
+    
     for triple in dirty_triples:
-        result = verify_claim(triple, source_graph)
+        result = verify_claim(triple, source_graph, 
+                              source_sentences=source_graph.source_sentences)
+        status = "CLEAN" if result.is_verified else "DIRTY"
+        print(f"[{status}]: [{triple.as_text()}] -- {result.label}")
         if result.is_verified:
-            print(f"✅ CLEAN: [{triple.as_text()}]")
             save_verified_fact(triple)
-        else:
-            print(f"❌ DIRTY (Hallucination): [{triple.as_text()}]")
+        # Dirty triples are discarded — not written to L3
 
     return final_answer
 
@@ -283,10 +295,22 @@ def main() -> int:
         expected = item["expected"]
 
         raw_tokens = count_tokens(text)
+        # Baseline: raw text token cost per extracted triple (before compression)
 
         triples = extract_source_triples(text)
+        total_triples = len(triples)
+        baseline_sdpt = (raw_tokens / total_triples) if total_triples > 0 else 0.0
+
+        import re
+        source_sentences = [s.strip() for s in 
+            re.split(r'(?<=[.!?])\s+', text) if len(s.strip()) > 20]
+
         ranked_triples = rank_triples_by_importance(triples)
-        source_graph = build_source_graph(triples, embedder=get_embedder())
+        source_graph = build_source_graph(
+            triples, 
+            embedder=get_embedder(),
+            source_sentences=source_sentences
+        )
 
         cache = L1Cache(budgets={"facts": 30})
         for triple, score in ranked_triples:
@@ -310,29 +334,57 @@ def main() -> int:
                 "raw_tokens": raw_tokens,
                 "caveman_tokens": caveman_tokens,
                 "reduction": reduction,
+                "total_triples": total_triples,
+                "baseline_sdpt": baseline_sdpt,
                 "sdpt": sdpt_value,
+                "sdpt_improvement": baseline_sdpt - sdpt_value,
                 "accuracy": is_correct,
             }
         )
 
-    print("=" * 106)
+    print("=" * 130)
     print("CAVEMAN BENCHMARK REPORT")
-    print("=" * 106)
+    print("=" * 130)
     print(
-        f"{'Case':<4} {'Raw Tokens':>11} {'Caveman Tokens':>15} {'Reduction %':>12} {'SDpT (Lower Better)':>20} {'Accuracy':>10}"
+        f"{'Case':<4} {'Raw Tok':>8} {'Cave Tok':>10} {'Red%':>8} {'Baseline SDpT':>15} {'Caveman SDpT':>15} {'Improvement':>12} {'Accuracy':>10}"
     )
-    print("-" * 106)
+    print("-" * 130)
     for index, row in enumerate(rows, start=1):
         accuracy_label = "PASS" if row["accuracy"] else "FAIL"
         print(
-            f"{index:<4} {row['raw_tokens']:>11} {row['caveman_tokens']:>15} "
-            f"{row['reduction']:>11.2f}% {row['sdpt']:>20.4f} {accuracy_label:>10}"
+            f"{index:<4} {row['raw_tokens']:>8} {row['caveman_tokens']:>10} "
+            f"{row['reduction']:>7.2f}% {row['baseline_sdpt']:>15.4f} {row['sdpt']:>15.4f} "
+            f"{row['sdpt_improvement']:>12.4f} {accuracy_label:>10}"
         )
-    print("-" * 106)
+    print("-" * 130)
     for index, row in enumerate(rows, start=1):
         print(f"Case {index}: {row['question']}")
         print(f"  Expected: {row['expected']}")
         print(f"  Answer:   {row['answer']}")
+
+    import json, datetime
+    results_summary = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "model": "qwen2.5:1.5b",
+        "extractor": "spaCy (source) + GLiNER-relex (claims)",
+        "total_cases": len(rows),
+        "accuracy": sum(1 for r in rows if r["accuracy"]) / len(rows),
+        "avg_compression_ratio": sum(r["reduction"] for r in rows) / len(rows),
+        "avg_baseline_sdpt": sum(r["baseline_sdpt"] for r in rows) / len(rows),
+        "avg_caveman_sdpt": sum(r["sdpt"] for r in rows) / len(rows),
+        "avg_sdpt_improvement": sum(r["sdpt_improvement"] for r in rows) / len(rows),
+        "cases": rows
+    }
+
+    with open("caveman_benchmark_results.json", "w") as f:
+        json.dump(results_summary, f, indent=2)
+
+    print("\n[SUCCESS] Results saved to caveman_benchmark_results.json")
+    print(f"   Overall accuracy: {results_summary['accuracy']*100:.1f}%")
+    print(f"   Avg compression: {results_summary['avg_compression_ratio']:.1f}%")
+    print(f"   Avg baseline SDpT: {results_summary['avg_baseline_sdpt']:.2f}")
+    print(f"   Avg Caveman SDpT:  {results_summary['avg_caveman_sdpt']:.2f}")
+    print(f"   Avg improvement:   {results_summary['avg_sdpt_improvement']:.2f} tokens/ACU")
 
     return 0
 

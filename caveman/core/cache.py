@@ -38,6 +38,7 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "facts": 100,
     "history": 150,
     "tools": 100,
+    "scratch": 80,
 }
 
 
@@ -49,6 +50,7 @@ class L1Cache:
         self.set_facts: OrderedDict[str, CacheEntry] = OrderedDict()
         self.set_history: deque[HistoryTurn] = deque()
         self.set_tools: deque[ToolResult] = deque()
+        self.set_scratch: deque[str] = deque()
 
     def add_system_instruction(self, text: str) -> None:
         cleaned = text.strip()
@@ -89,6 +91,37 @@ class L1Cache:
         self.set_tools.append(ToolResult(tool_name=tool_name.strip() or "tool", text=cleaned))
         self._trim_tools_to_budget()
 
+    def add_scratch_entry(self, text: str) -> None:
+        """
+        Add LLM-generated content to the SCRATCH set.
+        All content here is dirty (unverified) by default.
+        It will be evicted and passed to Sentinel before 
+        write-back to L2/L3.
+        """
+        cleaned = text.strip()
+        if not cleaned:
+            return
+        self.set_scratch.append(cleaned)
+        self._trim_scratch_to_budget()
+
+    def _trim_scratch_to_budget(self) -> None:
+        while self._estimate_scratch_tokens() > self.budgets["scratch"] \
+              and self.set_scratch:
+            self.set_scratch.popleft()
+
+    def _estimate_scratch_tokens(self) -> int:
+        return sum(_count_tokens(t) for t in self.set_scratch)
+
+    def flush_scratch(self) -> list[str]:
+        """
+        Evict all SCRATCH entries for Sentinel verification.
+        Called by the write-back gate before session ends.
+        Returns the list of dirty entries for verification.
+        """
+        dirty = list(self.set_scratch)
+        self.set_scratch.clear()
+        return dirty
+
     def extend(self, triples: Iterable[KnowledgeTriple]) -> None:
         for triple in triples:
             self.add_fact(triple)
@@ -115,6 +148,10 @@ class L1Cache:
         if self.set_history:
             lines.append("Conversation History:")
             lines.extend(f"{turn.role}: {turn.text}" for turn in self.set_history)
+
+        if self.set_scratch:
+            lines.append("Unverified Scratch (Dirty):")
+            lines.extend(self.set_scratch)
 
         return lines
 

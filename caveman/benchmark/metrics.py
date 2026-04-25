@@ -11,7 +11,18 @@ def count_tokens(text: str) -> int:
 
 
 def sdpt(unique_acus_preserved: float, compressed_token_count: int) -> float:
-    """Return SDpT as compressed tokens per preserved ACU; lower values indicate better compression efficiency."""
+    """
+    Semantic Density per Token (SDpT).
+    
+    Returns tokens-per-ACU: the number of compressed tokens 
+    required to represent each preserved Atomic Content Unit.
+    
+    Lower SDpT = better compression efficiency.
+    A system that preserves 10 ACUs in 30 tokens (SDpT=3.0)
+    is more efficient than one that uses 50 tokens (SDpT=5.0).
+    
+    Compare against raw_tokens / total_triples to get baseline SDpT.
+    """
     if unique_acus_preserved <= 0:
         raise ValueError("unique_acus_preserved must be positive.")
     if compressed_token_count < 0:
