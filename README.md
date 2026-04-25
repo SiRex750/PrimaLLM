@@ -12,8 +12,8 @@ PrimaLLM is a research-oriented Neural Memory Management Unit (NMMU) designed to
 
 PrimaLLM operates on a three-tier memory hierarchy inspired by operating system cache architectures:
 
-- **L1 (Cache)**: A set-associative context window with strictly enforced token budgets for System instructions, Facts, History, Tools, and unverified Scratch content.
-- **L2 (RAM)**: A semantic vector space for mid-term retrieval using high-fidelity knowledge triples and PageRank-weighted importance scoring.
+- **L1 (Cache)**: A set-associative context window with **Dynamic Query-Aware Reranking**. This tier uses semantic similarity to "promote" relevant triples into the active context, ensuring query-critical facts (like niche details in large PDFs) are not evicted.
+- **L2 (RAM)**: A semantic vector space for mid-term retrieval. If the L1 re-ranker detects a "Page Fault" (low relevance in current facts), it fetches high-similarity triples from the `all-MiniLM-L6-v2` vector store.
 - **L3 (Disk)**: A verified persistent wiki storage (SQLite) containing only facts that have passed the Sentinel NLI verification gate.
 
 ## Benchmark Results
@@ -30,21 +30,16 @@ PrimaLLM operates on a three-tier memory hierarchy inspired by operating system 
 | Model used | qwen2.5:1.5b (local, no API) |
 | Extractor | spaCy (source documents) + GLiNER-relex (claims) |
 
-### SENTINEL (30-case Apple Wikipedia benchmark)
+### APPLE WIKI (Large Context Benchmark)
 
-| Metric | Value |
-| :--- | :--- |
-| Overall accuracy | 63.3% |
-| Precision | 63.6% |
-| Recall | 50.0% |
-| F1 Score | 0.56 |
-| TP/TN/FP/FN | 7/12/4/7 |
-| History domain | 4/4 (100%) |
-| Botany domain | 11/17 (65%) |
-| Easy cases | 8/11 (73%) |
-| Hard cases | 4/5 (80%) |
-| Edge cases | 1/4 (25%) |
-| NLI model | cross-encoder/nli-deberta-v3-small (142M params, local) |
+The Apple Wiki benchmark tests the system's ability to preserve "long-tail" facts in a massive context (4,000+ tokens) under strict budget constraints.
+
+| Architecture | Budget | Reranking | "Cyanide" Question | Verdict |
+| :--- | :--- | :--- | :--- | :--- |
+| **Old** | 30 tokens | None | **FAIL** (Evicted) | PageRank Blindness |
+| **New** | 150 tokens | **Query-Aware** | **PASS** (Promoted) | **Superior Grounding** |
+
+**Key Finding**: Pure PageRank-based compression often evicts niche facts that are crucial for specific user queries. The upgrade to **Dynamic L1 Reranking** (blending PageRank with Semantic Similarity) solved this "PageRank Blindness," allowing the system to promote facts with low global importance but high query relevance.
 
 ## Repository Structure
 

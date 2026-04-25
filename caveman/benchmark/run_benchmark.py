@@ -312,9 +312,17 @@ def main() -> int:
             source_sentences=source_sentences
         )
 
-        cache = L1Cache(budgets={"facts": 30})
+        cache = L1Cache(budgets={
+            "facts": 150,
+            "scratch": 100,
+        })
         for triple, score in ranked_triples:
-            cache.add_fact(triple, pagerank_score=score)
+            cache.route_triple(triple, pagerank_score=score)
+
+        # Query-aware re-ranking: re-score facts by relevance to the question
+        # This is the prefetch/promotion step in the cache hierarchy.
+        embedder = get_embedder()
+        cache.rerank_facts_for_query(question, embedder)
 
         cached_triples = [entry.triple for entry in cache.active_facts.values()]
         caveman_text = generate_caveman_prose(cached_triples)

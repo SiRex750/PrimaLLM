@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict, deque
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Iterable
 import tiktoken
 
@@ -39,6 +40,25 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "history": 150,
     "tools": 100,
     "scratch": 80,
+}
+
+MIN_FACTS_FLOOR: int = 2
+
+
+# Routing rules that map triples to their correct set.
+# Each rule is a predicate on the triple's verb and subject.
+# First matching rule wins. "facts" is the default fallback.
+SET_ROUTING_RULES: dict[str, object] = {
+    "history": lambda t: any(
+        w in t.verb.lower()
+        for w in ["said", "spoke", "asked", "replied", "told",
+                  "reported", "announced", "stated", "claimed"]
+    ),
+    "tools": lambda t: any(
+        w in t.subject.lower()
+        for w in ["tool", "result", "output", "search",
+                  "query", "api", "response"]
+    ),
 }
 
 
@@ -104,6 +124,96 @@ class L1Cache:
         self.set_scratch.append(cleaned)
         self._trim_scratch_to_budget()
 
+    def route_triple(
+        self,
+        triple: KnowledgeTriple,
+        pagerank_score: float = 0.0,
+    ) -> str:
+        """
+        Automatically route a triple to the correct set based on
+        its semantic type. Implements the set-index addressing
+        function from set-associative cache architecture.
+
+        Returns the name of the set it was routed to.
+
+        The routing function works as follows:
+        - Speech/communication verbs → HISTORY set
+        - Tool/API/output subjects → TOOLS set
+        - Everything else → FACTS set (default)
+
+        This ensures that different semantic categories of knowledge
+        occupy separate cache partitions, preventing eviction
+        competition between structurally unrelated facts.
+        """
+        for set_name, rule in SET_ROUTING_RULES.items():
+            if rule(triple):
+                if set_name == "history":
+                    self.add_history_turn("system", triple.as_text())
+                elif set_name == "tools":
+                    self.add_tool_result("auto", triple.as_text())
+                return set_name
+
+        # Default route: FACTS
+        self.add_fact(triple, pagerank_score=pagerank_score)
+        return "facts"
+
+    def get_routing_stats(self) -> dict[str, int]:
+        """Return count of entries in each set for telemetry."""
+        return {
+            "system": len(self.set_system),
+            "facts": len(self.set_facts),
+            "history": len(self.set_history),
+            "tools": len(self.set_tools),
+            "scratch": len(self.set_scratch),
+        }
+
+    def rerank_facts_for_query(
+        self,
+        query: str,
+        embedder,
+        alpha: float = 0.4,
+    ) -> None:
+        """
+        Re-rank FACTS set by blending PageRank score with cosine
+        similarity to the user query.
+
+        This implements query-aware cache prefetching: once the
+        query is known, facts most relevant to it are promoted
+        (given higher scores) so they survive budget trimming.
+
+        Formula:
+            new_score = alpha * pagerank_score
+                      + (1 - alpha) * cosine_similarity(fact, query)
+
+        alpha=0.4 weights query relevance (0.6) more heavily than
+        structural importance (0.4). Adjust alpha toward 1.0 to
+        rely more on PageRank, toward 0.0 to rely more on query.
+
+        Args:
+            query: The user's question string.
+            embedder: sentence-transformers SentenceTransformer instance.
+            alpha: blend weight for PageRank score (0.0-1.0).
+        """
+        if not self.set_facts:
+            return
+
+        from sklearn.metrics.pairwise import cosine_similarity as cos_sim
+        import numpy as np
+
+        query_vec = embedder.encode(query).reshape(1, -1)
+
+        for key, entry in self.set_facts.items():
+            fact_vec = embedder.encode(entry.text).reshape(1, -1)
+            similarity = float(cos_sim(query_vec, fact_vec)[0][0])
+            # Blend structural importance with query relevance
+            entry.pagerank_score = (
+                alpha * entry.pagerank_score
+                + (1.0 - alpha) * similarity
+            )
+
+        # Re-trim with updated scores so highest-relevance facts survive
+        self._trim_facts_to_budget()
+
     def _trim_scratch_to_budget(self) -> None:
         while self._estimate_scratch_tokens() > self.budgets["scratch"] \
               and self.set_scratch:
@@ -159,8 +269,12 @@ class L1Cache:
         return "\n".join(self.as_context_lines())
 
     def _trim_facts_to_budget(self) -> None:
-        while self._estimate_facts_tokens() > self.budgets["facts"] and self.set_facts:
-            lowest_key = min(self.set_facts, key=lambda key: self.set_facts[key].pagerank_score)
+        while (self._estimate_facts_tokens() > self.budgets["facts"]
+               and len(self.set_facts) > MIN_FACTS_FLOOR):
+            lowest_key = min(
+                self.set_facts,
+                key=lambda key: self.set_facts[key].pagerank_score
+            )
             del self.set_facts[lowest_key]
 
     def _trim_history_to_budget(self) -> None:
