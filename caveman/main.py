@@ -6,7 +6,7 @@ import sys
 from caveman.core.cache import L1Cache
 from caveman.core.compressor import generate_caveman_prose
 from caveman.core.graph import rank_triples_by_importance
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_source_triples
 
 
 def main(filename: str = "source_material.txt") -> None:
@@ -25,7 +25,7 @@ def main(filename: str = "source_material.txt") -> None:
         print("File not found, using default text.")
         source_text = default_text
 
-    triples = extract_knowledge_triples(source_text)
+    triples = extract_source_triples(source_text)
     ranked_triples = rank_triples_by_importance(triples)
 
     cache = L1Cache(budgets={"facts": 50})

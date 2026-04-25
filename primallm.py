@@ -10,7 +10,7 @@ import ollama
 from caveman.core import L1Cache, generate_caveman_prose, rank_triples_by_importance
 from sentinel.core import build_source_graph, verify_claim
 from sentinel.core.wiki_storage import load_wiki, save_verified_fact
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 
 
 source_text = (
@@ -108,8 +108,11 @@ def main() -> None:
     _configure_console_encoding()
 
     _banner("STEP 1 - INGESTION (L2 RAM)")
-    source_triples = extract_knowledge_triples(source_text)
-    source_graph = build_source_graph(source_triples, embedder=get_embedder())
+    import re
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', source_text) if len(s.strip()) > 20]
+    
+    source_triples = extract_source_triples(source_text)
+    source_graph = build_source_graph(source_triples, embedder=get_embedder(), source_sentences=sentences)
     print(f"Source triples extracted: {len(source_triples)}")
     for triple in source_triples:
         print(f"  - {triple.as_text()}")
@@ -227,13 +230,13 @@ Assistant: INSUFFICIENT DATA. The source document does not contain this informat
     print(final_answer or "<empty>")
 
     _banner("STEP 6 - SENTINEL WRITE-BACK")
-    dirty_triples = extract_knowledge_triples(final_answer)
+    dirty_triples = extract_claim_triples(final_answer)
     has_contradiction = False
     if not dirty_triples:
         print("No triples extracted from final answer. Nothing to verify.")
 
     for triple in dirty_triples:
-        verdict = verify_claim(triple, source_graph)
+        verdict = verify_claim(triple, source_graph, source_sentences=source_graph.source_sentences)
         if verdict.is_verified:
             print(f"\u2705 CLEAN: [{triple.as_text()}]")
             print(f"   Sentinel reason: {verdict.reason}")

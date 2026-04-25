@@ -1,4 +1,4 @@
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples
 
 def test_gliner_smoke():
     text = (
@@ -9,7 +9,7 @@ def test_gliner_smoke():
     )
 
     print(f"Extracting triples from text:\n{text}\n")
-    triples = extract_knowledge_triples(text)
+    triples = extract_claim_triples(text)
 
     print(f"Found {len(triples)} triples:")
     for i, t in enumerate(triples, 1):

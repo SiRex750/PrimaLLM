@@ -12,7 +12,7 @@ from caveman.core.graph import rank_triples_by_importance
 from sentinel.core.source_graph import build_source_graph
 from sentinel.core.verifier import verify_claim
 from sentinel.core.wiki_storage import load_wiki, save_verified_fact
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 from shared.triple import KnowledgeTriple
 
 
@@ -251,7 +251,7 @@ If the answer is NOT in the L1 Cache, you MUST trigger an L2 Page Fault by outpu
     print("=" * 100)
     print(final_answer)
 
-    dirty_triples = extract_knowledge_triples(final_answer)
+    dirty_triples = extract_claim_triples(final_answer)
     print("\n" + "=" * 100)
     print("SENTINEL VERIFICATION STATUS")
     print("=" * 100)
@@ -284,7 +284,7 @@ def main() -> int:
 
         raw_tokens = count_tokens(text)
 
-        triples = extract_knowledge_triples(text)
+        triples = extract_source_triples(text)
         ranked_triples = rank_triples_by_importance(triples)
         source_graph = build_source_graph(triples, embedder=get_embedder())
 

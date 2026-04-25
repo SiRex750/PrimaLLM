@@ -45,7 +45,7 @@ class FakeNLP:
         return self._doc
 
 
-def test_extract_knowledge_triples(monkeypatch):
+def test_extract_source_triples(monkeypatch):
     sent = FakeSentence(
         [
             FakeToken("Caesar", dep_="nsubj"),
@@ -55,7 +55,7 @@ def test_extract_knowledge_triples(monkeypatch):
     )
     monkeypatch.setattr(extractor_module, "_load_spacy_model", lambda: FakeNLP(FakeDoc([sent])))
 
-    triples = extractor_module.extract_knowledge_triples("Caesar conquered Gaul.")
+    triples = extractor_module.extract_source_triples("Caesar conquered Gaul.")
 
     assert triples == [KnowledgeTriple(subject="Caesar", verb="conquer", object="Gaul")]
 
@@ -79,7 +79,7 @@ def test_extract_object_with_verb_prep_phrase(monkeypatch):
     sent = FakeSentence([subj, verb, dobj, prep, pobj])
     monkeypatch.setattr(extractor_module, "_load_spacy_model", lambda: FakeNLP(FakeDoc([sent])))
 
-    triples = extractor_module.extract_knowledge_triples("It generates ATP through oxidative phosphorylation.")
+    triples = extractor_module.extract_source_triples("It generates ATP through oxidative phosphorylation.")
 
     assert triples == [KnowledgeTriple(subject="It", verb="generate", object="ATP through oxidative phosphorylation")]
 
@@ -98,6 +98,6 @@ def test_extract_object_keeps_compound_nouns(monkeypatch):
     )
     monkeypatch.setattr(extractor_module, "_load_spacy_model", lambda: FakeNLP(FakeDoc([sent])))
 
-    triples = extractor_module.extract_knowledge_triples("Neil Armstrong piloted the Lunar Module Eagle.")
+    triples = extractor_module.extract_source_triples("Neil Armstrong piloted the Lunar Module Eagle.")
 
     assert triples == [KnowledgeTriple(subject="Neil Armstrong", verb="pilot", object="the Lunar Module Eagle")]

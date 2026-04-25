@@ -14,7 +14,7 @@ from pyvis.network import Network
 
 from caveman.core import L1Cache, rank_triples_by_importance
 from sentinel.core import build_source_graph, verify_claim
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 from shared.l3_memory import fetch_clean_facts, save_fact
 from shared.triple import KnowledgeTriple
 
@@ -342,14 +342,19 @@ def process_pdf(file) -> tuple[int, int]:
     reader = PyPDF2.PdfReader(file)
     triples: list[KnowledgeTriple] = []
     source_page_lookup: dict[tuple[str, str, str], int] = {}
+    all_sentences: list[str] = []
 
     for page_number, page in enumerate(reader.pages, start=1):
         page_text = (page.extract_text() or "").strip()
         if not page_text:
             continue
 
-        page_triples = extract_knowledge_triples(page_text)
+        page_triples = extract_source_triples(page_text)
         triples.extend(page_triples)
+
+        import re
+        page_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', page_text) if len(s.strip()) > 20]
+        all_sentences.extend(page_sentences)
 
         for triple in page_triples:
             source_page_lookup.setdefault(_triple_key(triple), page_number)
@@ -360,7 +365,7 @@ def process_pdf(file) -> tuple[int, int]:
         return 0, 0
     
     embedder = get_embedder()
-    source_graph = build_source_graph(triples, embedder=embedder)
+    source_graph = build_source_graph(triples, embedder=embedder, source_sentences=all_sentences)
     st.session_state.source_graph = source_graph
     st.session_state.triple_source_pages = source_page_lookup
 
@@ -437,7 +442,7 @@ def _run_sentinel_writeback(final_answer: str) -> bool:
         _push_telemetry_item("sentinel_log", "No source graph loaded; Sentinel verification skipped.")
         return True
 
-    answer_triples = extract_knowledge_triples(final_answer)
+    answer_triples = extract_claim_triples(final_answer)
     if not answer_triples:
         _push_telemetry_item("sentinel_log", "No triples extracted from assistant answer.")
         return True
@@ -446,7 +451,7 @@ def _run_sentinel_writeback(final_answer: str) -> bool:
     has_contradiction = False
 
     for triple in answer_triples:
-        verdict = verify_claim(triple, source_graph)
+        verdict = verify_claim(triple, source_graph, source_sentences=source_graph.source_sentences)
         if verdict.is_verified:
             source_page = _resolve_source_page(triple, source_page_lookup)
             inserted = save_fact(

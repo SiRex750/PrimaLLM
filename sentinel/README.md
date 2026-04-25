@@ -70,19 +70,19 @@ Typical output shape:
 ## Using Sentinel as a Library
 
 ```python
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 from sentinel.core.source_graph import build_source_graph
 from sentinel.core.verifier import verify_claim
 from sentinel.core.wiki_storage import save_verified_fact
 
 source_text = "Neil Armstrong piloted the Lunar Module Eagle."
-source_graph = build_source_graph(extract_knowledge_triples(source_text))
+source_graph = build_source_graph(extract_source_triples(source_text))
 
 claim = "Neil Armstrong piloted the Lunar Module Eagle"
 result = verify_claim(claim, source_graph)
 
 if result.is_verified:
-	 for triple in extract_knowledge_triples(claim):
+	 for triple in extract_claim_triples(claim):
 		  save_verified_fact(triple)
 ```
 

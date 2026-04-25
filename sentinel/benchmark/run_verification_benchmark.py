@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sentinel.core import build_source_graph, verify_claim
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 
 
 DATASET = {
@@ -44,7 +44,7 @@ CLAIMS = [
 
 def main() -> int:
     source_text = DATASET["source_text"]
-    source_triples = extract_knowledge_triples(source_text)
+    source_triples = extract_source_triples(source_text)
     source_graph = build_source_graph(source_triples)
 
     tp = 0
@@ -62,7 +62,7 @@ def main() -> int:
         claim_text = str(claim["text"])
         expected_true = bool(claim["is_true"])
 
-        claim_triples = extract_knowledge_triples(claim_text)
+        claim_triples = extract_claim_triples(claim_text)
         if claim_triples:
             triple = claim_triples[0]
             result = verify_claim(triple, source_graph)

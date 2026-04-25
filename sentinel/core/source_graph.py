@@ -14,13 +14,14 @@ class SourceGraph:
     graph: nx.DiGraph
     checksums: dict[str, str]
     master_checksum: str
+    source_sentences: list[str] = None
 
 
 def triple_checksum(triple: KnowledgeTriple) -> str:
     return sha256(triple.as_text().encode("utf-8")).hexdigest()
 
 
-def build_source_graph(triples: list[KnowledgeTriple], embedder=None) -> SourceGraph:
+def build_source_graph(triples: list[KnowledgeTriple], embedder=None, source_sentences: list[str] = None) -> SourceGraph:
     graph = nx.DiGraph()
     checksums: dict[str, str] = {}
 
@@ -46,4 +47,5 @@ def build_source_graph(triples: list[KnowledgeTriple], embedder=None) -> SourceG
         graph=graph,
         checksums=checksums,
         master_checksum=master_checksum,
+        source_sentences=source_sentences
     )

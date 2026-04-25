@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shared.extractor import extract_knowledge_triples
+from shared.extractor import extract_claim_triples, extract_source_triples
 from sentinel.core.source_graph import build_source_graph
 from sentinel.core.verifier import verify_claim
 from sentinel.core.wiki_storage import save_verified_fact
@@ -20,14 +20,14 @@ def main() -> None:
     print("--- SENTINEL VERIFICATION ORACLE ---\n")
     
     print("1. Extracting Source Graph (Semantic Checksum)...")
-    source_triples = extract_knowledge_triples(source_text)
+    source_triples = extract_source_triples(source_text)
     source_graph = build_source_graph(source_triples)
     print(f"   Nodes: {source_graph.graph.number_of_nodes()} | Edges: {source_graph.graph.number_of_edges()}")
     print(f"   Master Checksum (SHA-256): {source_graph.master_checksum[:16]}...\n")
 
     print("2. Testing Valid AI Response:")
     print(f"   AI Output: '{ai_response_true}'")
-    true_claims = extract_knowledge_triples(ai_response_true)
+    true_claims = extract_claim_triples(ai_response_true)
     for claim in true_claims:
         print(f"   Claim Extracted: [{claim.as_text()}]")
         
@@ -43,7 +43,7 @@ def main() -> None:
 
     print("3. Testing Hallucinated AI Response:")
     print(f"   AI Output: '{ai_response_false}'")
-    false_claims = extract_knowledge_triples(ai_response_false)
+    false_claims = extract_claim_triples(ai_response_false)
     for claim in false_claims:
         print(f"   Claim Extracted: [{claim.as_text()}]")
         
