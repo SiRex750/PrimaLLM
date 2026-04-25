@@ -41,6 +41,28 @@ The Apple Wiki benchmark tests the system's ability to preserve "long-tail" fact
 
 **Key Finding**: Pure PageRank-based compression often evicts niche facts that are crucial for specific user queries. The upgrade to **Dynamic L1 Reranking** (blending PageRank with Semantic Similarity) solved this "PageRank Blindness," allowing the system to promote facts with low global importance but high query relevance.
 
+### SENTINEL (30-case NLI benchmark)
+
+The Sentinel benchmark evaluates the NLI-based verification gate using 30 diverse test cases across four domains from the Apple Wikipedia article.
+
+| Metric | Value |
+| :--- | :--- |
+| **Overall Accuracy** | 63.3% |
+| Precision | 63.6% |
+| Recall | 50.0% |
+| F1 Score | 56.0% |
+| TP / TN / FP / FN | 7 / 12 / 4 / 7 |
+| Model used | DeBERTa-v3-small (Local NLI) |
+
+#### Performance by Difficulty
+- **Easy**: 72.7% (8/11)
+- **Medium**: 60.0% (6/10)
+- **Hard**: 80.0% (4/5)
+- **Edge**: 25.0% (1/4)
+
+**Key Finding**: Sentinel demonstrates robust performance on easy and medium factual claims. The high "Hard" case accuracy (80%) shows strong resistance to subtle adversarial distortions. However, performance on "Edge" cases (multi-hop entity resolution and complex numbers) remains an area for future optimization with larger local NLI encoders.
+
+
 ## Repository Structure
 
 - `shared/` — Core `KnowledgeTriple` dataclass, dual extractor (spaCy + GLiNER-relex), and L3 SQLite memory interfaces.
