@@ -58,7 +58,7 @@ Assistant: {"tool": "search_memory", "keyword": "photosynthesis formula"}
 [SYSTEM: TOOL RESULT: No memory hit for keyword]
 Assistant: INSUFFICIENT DATA. The source document does not contain this information."""
 
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3.5")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 OLLAMA_OPTIONS = {
     "temperature": 0.0,
     "num_predict": 512,  # Increased to prevent truncating complex tool payloads
@@ -391,13 +391,58 @@ def process_pdf(file) -> tuple[int, int]:
 
 
 def _render_sidebar() -> None:
-    st.sidebar.title("NMMU Telemetry")
+    st.markdown("""
+        <style>
+            .telemetry-card { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #448aff; }
+            .telemetry-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+            .telemetry-value { font-size: 1.2rem; font-weight: bold; margin-top: 2px; }
+            .status-tag { font-size: 0.6rem; background: #00c853; padding: 2px 5px; border-radius: 4px; color: white; vertical-align: middle; }
+        </style>
+    """, unsafe_allow_html=True)
+    with st.sidebar:
+        st.markdown("<h2 style='font-size: 1.5rem;'>SYSTEM TELEMETRY</h2>", unsafe_allow_html=True)
+        st.divider()
 
-    source_graph = st.session_state.source_graph
-    active_nodes = source_graph.graph.number_of_nodes() if source_graph is not None else 0
-    st.sidebar.metric("Active L2 Nodes", active_nodes)
-    st.sidebar.caption(f"L1 Status: {st.session_state.telemetry.get('l1_status', 'unknown')}")
-    st.sidebar.caption(f"Tool Calls: {st.session_state.telemetry.get('tool_calls', 0)}")
+        # Node Density Card
+        source_graph = st.session_state.source_graph
+        active_nodes = source_graph.graph.number_of_nodes() if source_graph is not None else 0
+        st.markdown(f"""
+            <div class="telemetry-card">
+                <div class="telemetry-label">Active L2 Node Density</div>
+                <div class="telemetry-value">{active_nodes}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # L1 Status Card
+        l1_status = st.session_state.telemetry.get("l1_status", "idle").upper()
+        st.markdown(f"""
+            <div class="telemetry-card">
+                <div class="telemetry-label">L1 Context Status</div>
+                <div class="telemetry-value">{l1_status} <span class="status-tag">Live</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Tool Call Counters
+        tool_calls = st.session_state.telemetry.get("tool_calls", 0)
+        st.markdown(f"""
+            <div class="telemetry-card">
+                <div class="telemetry-label">Total Tool Faults (L2/L3)</div>
+                <div class="telemetry-value">{tool_calls}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.divider()
+        st.markdown("<div class='telemetry-label'>Memory Fault Logs</div>", unsafe_allow_html=True)
+        for fault in st.session_state.telemetry.get("memory_faults", [])[-5:]:
+            st.caption(f"> {fault}")
+
+        st.divider()
+        if st.button("Flush L1 Cache"):
+            st.session_state.l1_cache.set_facts.clear()
+            st.session_state.l1_cache.set_history.clear()
+            st.session_state.l1_cache.set_tools.clear()
+            st.session_state.telemetry["l1_status"] = "flushed"
+            st.rerun()
 
     cache: L1Cache = st.session_state.l1_cache
     with st.sidebar.expander("L1 Cache Partitions", expanded=True):
@@ -638,6 +683,94 @@ def render_graph_visual(source_graph) -> str:
 
 def main() -> None:
     _init_session_state()
+
+    # ── Dark Hardware Terminal UI Aesthetic ──
+    st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+        
+        html, body, [data-testid="stAppViewContainer"] {
+            background-color: #0d1117;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        
+        /* Typography overrides */
+        .stMarkdown, .stText, p, li, h1, h2, h3, h4, h5, h6, span {
+            font-family: 'IBM Plex Mono', monospace !important;
+        }
+        
+        /* Matrix/Terminal Green Accents */
+        h1, h2, h3 {
+            color: #58a6ff !important;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stMarkdown p {
+            color: #d1d5da;
+            line-height: 1.6;
+        }
+        
+        /* Sidebar Styling */
+        [data-testid="stSidebar"] {
+            background-color: #010409;
+            border-right: 1px solid #30363d;
+        }
+        
+        /* Telemetry Card Styling */
+        .telemetry-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .telemetry-label {
+            color: #8b949e;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .telemetry-value {
+            color: #3fb950;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .status-tag {
+            background-color: #238636;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+        }
+
+        /* Tabs Styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 24px;
+            background-color: transparent;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            height: 45px;
+            background-color: transparent !important;
+            border-bottom: 2px solid transparent;
+            color: #8b949e;
+        }
+
+        .stTabs [aria-selected="true"] {
+            color: #58a6ff !important;
+            border-bottom: 2px solid #58a6ff !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
     _render_sidebar()
 
     st.title("PrimaLLM: Context OS")

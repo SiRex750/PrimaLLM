@@ -7,18 +7,28 @@ from shared.triple import KnowledgeTriple
 
 
 def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.DiGraph:
+    from collections import Counter
     graph = nx.DiGraph()
-    for triple in triples:
-        graph.add_node(triple.subject)
-        graph.add_node(triple.object)
-        graph.add_edge(triple.subject, triple.object, verb=triple.verb)
+    triple_list = list(triples)
+    freq: Counter = Counter(t.as_text() for t in triple_list)
+    for triple in triple_list:
+        if not graph.has_node(triple.subject):
+            graph.add_node(triple.subject)
+        if not graph.has_node(triple.object):
+            graph.add_node(triple.object)
+        weight = freq[triple.as_text()]
+        if graph.has_edge(triple.subject, triple.object):
+            graph[triple.subject][triple.object]["weight"] += weight
+        else:
+            graph.add_edge(triple.subject, triple.object,
+                           verb=triple.verb, weight=weight)
     return graph
 
 
 def pagerank_scores(graph: nx.DiGraph) -> dict[str, float]:
     if graph.number_of_nodes() == 0:
         return {}
-    return nx.pagerank(graph)
+    return nx.pagerank(graph, weight="weight")
 
 
 def rank_triples_by_importance(triples: Iterable[KnowledgeTriple]) -> list[tuple[KnowledgeTriple, float]]:

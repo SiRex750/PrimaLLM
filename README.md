@@ -20,15 +20,20 @@ PrimaLLM operates on a three-tier memory hierarchy inspired by operating system 
 
 ### CAVEMAN (8-case QA benchmark)
 
-| Metric | Value |
-| :--- | :--- |
-| Overall accuracy | 75.0% |
-| Average token reduction | 42.1% |
-| Average baseline SDpT | 14.58 tokens/ACU |
-| Average Caveman SDpT | 8.90 tokens/ACU |
-| Average SDpT improvement | 5.69 tokens/ACU |
-| Model used | qwen2.5:1.5b (local, no API) |
-| Extractor | spaCy (source documents) + GLiNER-relex (claims) |
+| Metric | Budget=30 (Max Compression) | Budget=150 (Balanced) |
+|:---|:---|:---|
+| Overall accuracy | 75.0% | 75.0% |
+| Average token reduction | 42.1% | 38.9% |
+| Average baseline SDpT | 14.58 tokens/ACU | 14.58 tokens/ACU |
+| Average Caveman SDpT | 8.90 tokens/ACU | 8.96 tokens/ACU |
+| Average SDpT improvement | 5.69 tokens/ACU | 5.63 tokens/ACU |
+| Model | qwen2.5:1.5b (local) | qwen2.5:1.5b (local) |
+
+The L1 FACTS budget is a configurable parameter. 
+Higher budgets preserve more context (better accuracy on 
+complex queries) at the cost of compression ratio. 
+Lower budgets maximise token reduction at the risk of 
+evicting query-critical facts.
 
 ### APPLE WIKI (Large Context Benchmark)
 
