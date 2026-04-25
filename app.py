@@ -27,7 +27,12 @@ def get_embedder():
     return SentenceTransformer('all-MiniLM-L6-v2')
 
 
-st.set_page_config(layout="wide", page_title="PrimaLLM: Context OS")
+st.set_page_config(
+    layout="wide",
+    page_title="PrimaLLM",
+    page_icon="🧠",
+    initial_sidebar_state="expanded",
+)
 
 
 SYSTEM_INSTRUCTION = """You are the NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. 
@@ -46,14 +51,14 @@ You have two operating modes. You MUST output ONLY the mode's payload, NEVER the
 }
 
 Examples:
-Input: "What is an apple?"
-Assistant: "An apple is a round, edible fruit."
+Input: "What year did the French Revolution begin?"
+Assistant: "The French Revolution began in 1789."
 
-Input: "Who is King Rerir?"
-Assistant: {"tool": "search_memory", "keyword": "King Rerir"}
+Input: "Who founded Microsoft?"
+Assistant: {"tool": "search_memory", "keyword": "Microsoft founder"}
 
-Input: "What is the formula for photosynthesis?" (If not in L1 Cache)
-Assistant: {"tool": "search_memory", "keyword": "photosynthesis formula"}
+Input: "What is the boiling point of nitrogen?" (If not in L1 Cache)
+Assistant: {"tool": "search_memory", "keyword": "nitrogen boiling point"}
 
 [SYSTEM: TOOL RESULT: No memory hit for keyword]
 Assistant: INSUFFICIENT DATA. The source document does not contain this information."""
@@ -391,16 +396,16 @@ def process_pdf(file) -> tuple[int, int]:
 
 
 def _render_sidebar() -> None:
-    st.markdown("""
-        <style>
-            .telemetry-card { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #448aff; }
-            .telemetry-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-            .telemetry-value { font-size: 1.2rem; font-weight: bold; margin-top: 2px; }
-            .status-tag { font-size: 0.6rem; background: #00c853; padding: 2px 5px; border-radius: 4px; color: white; vertical-align: middle; }
-        </style>
-    """, unsafe_allow_html=True)
     with st.sidebar:
-        st.markdown("<h2 style='font-size: 1.5rem;'>SYSTEM TELEMETRY</h2>", unsafe_allow_html=True)
+        st.sidebar.markdown("""
+<div style="font-family:'IBM Plex Mono',monospace; 
+     font-size:0.65rem; text-transform:uppercase; 
+     letter-spacing:0.12em; color:#4d9fff; 
+     padding:0.5rem 0; border-bottom:1px solid #2a2a3a;
+     margin-bottom:0.5rem;">
+  ▸ NMMU Telemetry
+</div>
+""", unsafe_allow_html=True)
         st.divider()
 
         # Node Density Card
@@ -444,8 +449,29 @@ def _render_sidebar() -> None:
             st.session_state.telemetry["l1_status"] = "flushed"
             st.rerun()
 
+        st.divider()
+        st.markdown(
+            "<div class='telemetry-label' style='color:#b388ff'>Sentinel Gate Log</div>",
+            unsafe_allow_html=True
+        )
+        for entry in st.session_state.telemetry.get("sentinel_log", [])[-5:]:
+            if "CLEAN" in entry:
+                colour = "#00e676"
+            elif "CONTRADICTION" in entry:
+                colour = "#ff4444"
+            else:
+                colour = "#ffab40"
+            short = entry[:60] + "…" if len(entry) > 60 else entry
+            st.markdown(
+                f"<div style='font-family:IBM Plex Mono,monospace;"
+                f"font-size:0.62rem;color:{colour};padding:2px 0;"
+                f"border-left:2px solid {colour};padding-left:6px;"
+                f"margin:2px 0'>{short}</div>",
+                unsafe_allow_html=True
+            )
+
     cache: L1Cache = st.session_state.l1_cache
-    with st.sidebar.expander("L1 Cache Partitions", expanded=True):
+    with st.sidebar.expander("L1 CACHE PARTITIONS", expanded=False):
         st.markdown("**System**")
         st.write(cache.set_system or ["<empty>"])
 
@@ -457,22 +483,6 @@ def _render_sidebar() -> None:
 
         st.markdown("**Tools**")
         st.write([f"{item.tool_name}: {item.text}" for item in cache.set_tools] or ["<empty>"])
-
-    st.sidebar.subheader("Latest Memory Faults")
-    memory_faults = st.session_state.telemetry.get("memory_faults", [])
-    if memory_faults:
-        for item in reversed(memory_faults[-8:]):
-            st.sidebar.write(f"- {item}")
-    else:
-        st.sidebar.write("No memory faults recorded yet.")
-
-    st.sidebar.subheader("Sentinel Log")
-    sentinel_log = st.session_state.telemetry.get("sentinel_log", [])
-    if sentinel_log:
-        for item in reversed(sentinel_log[-8:]):
-            st.sidebar.write(f"- {item}")
-    else:
-        st.sidebar.write("No sentinel events recorded yet.")
 
 
 def _run_sentinel_writeback(final_answer: str) -> bool:
@@ -605,7 +615,44 @@ def render_graph_visual(source_graph) -> str:
         bgcolor="#0e1117",
         font_color="#fafafa",
     )
-    net.show_buttons(filter_=["physics"])
+    net.set_options("""
+    {
+      "physics": {
+        "enabled": true,
+        "solver": "forceAtlas2Based",
+        "forceAtlas2Based": {
+          "gravitationalConstant": -80,
+          "centralGravity": 0.01,
+          "springLength": 120,
+          "springConstant": 0.06,
+          "damping": 0.5
+        },
+        "stabilization": {
+          "enabled": true,
+          "iterations": 200,
+          "updateInterval": 25
+        },
+        "minVelocity": 0.75
+      },
+      "edges": {
+        "color": { "color": "#3d3d5c", "highlight": "#4d9fff" },
+        "font": { "size": 9, "color": "#555570", "face": "IBM Plex Mono" },
+        "smooth": { "type": "continuous" },
+        "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } },
+        "width": 1
+      },
+      "nodes": {
+        "shape": "dot",
+        "font": { "size": 11, "face": "IBM Plex Mono" }
+      },
+      "interaction": {
+        "hover": true,
+        "tooltipDelay": 100,
+        "hideEdgesOnDrag": true,
+        "navigationButtons": false
+      }
+    }
+    """)
 
     graph: nx.DiGraph = source_graph.graph
 
@@ -657,12 +704,18 @@ def render_graph_visual(source_graph) -> str:
         else:
             color = COLOR_DEFAULT
 
+        # Truncate long labels for clean display
+        display_label = label if len(label) <= 20 else label[:18] + "…"
+        
         net.add_node(
             label,
-            label=label,
+            label=display_label,
             size=size,
             color=color,
-            title=f"{label}\nPageRank: {pr:.4f}",
+            title=f"{label}\nPageRank: {pr:.4f}",  # full text on hover
+            font={"size": 11, "color": "#e8e8f0", "face": "IBM Plex Mono"},
+            borderWidth=1,
+            borderWidthSelected=2,
         )
 
     # ── Add edges ──
@@ -682,99 +735,278 @@ def render_graph_visual(source_graph) -> str:
 
 
 def main() -> None:
-    _init_session_state()
-
-    # ── Dark Hardware Terminal UI Aesthetic ──
     st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap');
-        
-        html, body, [data-testid="stAppViewContainer"] {
-            background-color: #0d1117;
-            font-family: 'IBM Plex Mono', monospace;
-        }
-        
-        /* Typography overrides */
-        .stMarkdown, .stText, p, li, h1, h2, h3, h4, h5, h6, span {
-            font-family: 'IBM Plex Mono', monospace !important;
-        }
-        
-        /* Matrix/Terminal Green Accents */
-        h1, h2, h3 {
-            color: #58a6ff !important;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .stMarkdown p {
-            color: #d1d5da;
-            line-height: 1.6;
-        }
-        
-        /* Sidebar Styling */
-        [data-testid="stSidebar"] {
-            background-color: #010409;
-            border-right: 1px solid #30363d;
-        }
-        
-        /* Telemetry Card Styling */
-        .telemetry-card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        
-        .telemetry-label {
-            color: #8b949e;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-        
-        .telemetry-value {
-            color: #3fb950;
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-        
-        .status-tag {
-            background-color: #238636;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.65rem;
-            text-transform: uppercase;
-        }
+<style>
+/* ── Import fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
-        /* Tabs Styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 24px;
-            background-color: transparent;
-        }
+/* ── Root theme ── */
+:root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #111118;
+    --bg-card: #16161f;
+    --bg-hover: #1e1e2a;
+    --border: #2a2a3a;
+    --border-accent: #3d3d5c;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888aa;
+    --text-muted: #555570;
+    --accent-blue: #4d9fff;
+    --accent-green: #00e676;
+    --accent-red: #ff4444;
+    --accent-amber: #ffab40;
+    --accent-purple: #b388ff;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'IBM Plex Sans', sans-serif;
+}
 
-        .stTabs [data-baseweb="tab"] {
-            height: 45px;
-            background-color: transparent !important;
-            border-bottom: 2px solid transparent;
-            color: #8b949e;
-        }
+/* ── Global app background ── */
+.stApp {
+    background-color: var(--bg-primary);
+    font-family: var(--font-sans);
+}
 
-        .stTabs [aria-selected="true"] {
-            color: #58a6ff !important;
-            border-bottom: 2px solid #58a6ff !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+/* ── Hide Streamlit chrome ── */
+#MainMenu, footer, header { visibility: hidden; }
+.stDeployButton { display: none; }
 
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background-color: var(--bg-secondary) !important;
+    border-right: 1px solid var(--border) !important;
+}
+[data-testid="stSidebar"] * {
+    font-family: var(--font-mono) !important;
+    font-size: 0.72rem !important;
+    color: var(--text-secondary) !important;
+}
+[data-testid="stSidebar"] .stMetric label {
+    color: var(--text-muted) !important;
+    font-size: 0.65rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-testid="stSidebar"] .stMetric [data-testid="stMetricValue"] {
+    color: var(--accent-blue) !important;
+    font-size: 1.4rem !important;
+    font-weight: 600;
+}
+
+/* ── Main content area ── */
+.main .block-container {
+    padding: 1.5rem 2rem 2rem 2rem;
+    max-width: 1400px;
+}
+
+/* ── Title ── */
+h1 {
+    font-family: var(--font-mono) !important;
+    font-size: 1.6rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem !important;
+}
+
+/* ── Caption / subtitle ── */
+[data-testid="stCaptionContainer"] p {
+    font-family: var(--font-mono) !important;
+    font-size: 0.7rem !important;
+    color: var(--text-muted) !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* ── File uploader ── */
+[data-testid="stFileUploader"] {
+    background: var(--bg-card) !important;
+    border: 1px dashed var(--border-accent) !important;
+    border-radius: 6px !important;
+    padding: 0.5rem !important;
+}
+[data-testid="stFileUploader"] * {
+    font-family: var(--font-mono) !important;
+    font-size: 0.78rem !important;
+    color: var(--text-secondary) !important;
+}
+
+/* ── Tabs ── */
+[data-testid="stTabs"] [role="tablist"] {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    gap: 0;
+    padding: 0;
+}
+[data-testid="stTabs"] [role="tab"] {
+    font-family: var(--font-mono) !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted) !important;
+    padding: 0.6rem 1.2rem !important;
+    border-bottom: 2px solid transparent !important;
+    background: transparent !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    color: var(--accent-blue) !important;
+    border-bottom: 2px solid var(--accent-blue) !important;
+}
+
+/* ── Chat messages ── */
+[data-testid="stChatMessage"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    margin-bottom: 0.5rem !important;
+    padding: 0.75rem 1rem !important;
+    font-family: var(--font-sans) !important;
+    font-size: 0.88rem !important;
+}
+[data-testid="stChatMessage"][data-testid*="user"] {
+    border-left: 3px solid var(--accent-blue) !important;
+}
+[data-testid="stChatMessage"][data-testid*="assistant"] {
+    border-left: 3px solid var(--accent-green) !important;
+}
+[data-testid="stChatMessage"] p {
+    color: var(--text-primary) !important;
+    font-size: 0.88rem !important;
+    line-height: 1.6 !important;
+}
+
+/* ── Chat input ── */
+[data-testid="stChatInput"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-accent) !important;
+    border-radius: 6px !important;
+}
+[data-testid="stChatInput"] textarea {
+    font-family: var(--font-sans) !important;
+    font-size: 0.88rem !important;
+    color: var(--text-primary) !important;
+    background: transparent !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* ── Status boxes (thinking indicator) ── */
+[data-testid="stStatus"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.75rem !important;
+    color: var(--text-secondary) !important;
+}
+
+/* ── Success / error / info alerts ── */
+[data-testid="stAlert"] {
+    border-radius: 4px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.75rem !important;
+    padding: 0.5rem 0.75rem !important;
+}
+
+/* ── Expander (L1 cache view in sidebar) ── */
+[data-testid="stExpander"] {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+}
+[data-testid="stExpander"] summary {
+    font-family: var(--font-mono) !important;
+    font-size: 0.7rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary) !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb {
+    background: var(--border-accent);
+    border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+/* ── Spinner ── */
+[data-testid="stSpinner"] {
+    color: var(--accent-blue) !important;
+}
+
+/* ── Sidebar section headers ── */
+[data-testid="stSidebar"] h2, 
+[data-testid="stSidebar"] h3 {
+    font-family: var(--font-mono) !important;
+    font-size: 0.65rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-purple) !important;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.3rem;
+    margin-top: 1rem !important;
+}
+
+/* ── Telemetry cards ── */
+.telemetry-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.4rem;
+}
+.telemetry-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+.telemetry-value {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    margin-top: 0.1rem;
+}
+.status-tag {
+    font-size: 0.55rem;
+    background: var(--accent-green);
+    color: #000;
+    padding: 1px 5px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+    font-weight: 600;
+}
+</style>
+""", unsafe_allow_html=True)
+
+    _init_session_state()
     _render_sidebar()
 
-    st.title("PrimaLLM: Context OS")
-    st.caption("Tiered Memory Runtime: L1 Set Cache, L2 Source Graph, L3 Verified Wiki")
+    st.markdown("""
+<div style="display:flex; align-items:baseline; gap:1rem; 
+     border-bottom:1px solid #2a2a3a; padding-bottom:0.75rem; 
+     margin-bottom:1rem;">
+  <span style="font-family:'IBM Plex Mono',monospace; 
+               font-size:1.4rem; font-weight:600; 
+               color:#e8e8f0; letter-spacing:-0.02em;">
+    PrimaLLM
+  </span>
+  <span style="font-family:'IBM Plex Mono',monospace; 
+               font-size:0.65rem; color:#555570; 
+               text-transform:uppercase; letter-spacing:0.1em;">
+    Neural Memory Management Unit &nbsp;·&nbsp; 
+    L1 Set Cache &nbsp;·&nbsp; L2 Source Graph &nbsp;·&nbsp; 
+    L3 Verified Wiki
+  </span>
+</div>
+""", unsafe_allow_html=True)
 
     uploaded_pdf = st.file_uploader("Upload source PDF", type=["pdf"])
     if uploaded_pdf is not None and st.session_state.loaded_pdf_name != uploaded_pdf.name:
