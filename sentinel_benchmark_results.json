@@ -1,19 +1,19 @@
 {
   "benchmark": "Apple Wikipedia \u2014 30 cases",
   "metrics": {
-    "accuracy": 0.6333,
-    "precision": 0.6364,
-    "recall": 0.5,
-    "f1": 0.56,
-    "TP": 7,
-    "TN": 12,
-    "FP": 4,
-    "FN": 7
+    "accuracy": 0.8333,
+    "precision": 0.8462,
+    "recall": 0.7857,
+    "f1": 0.8148,
+    "TP": 11,
+    "TN": 14,
+    "FP": 2,
+    "FN": 3
   },
   "by_domain": {
     "botany": {
-      "pass": 11,
-      "fail": 6
+      "pass": 16,
+      "fail": 1
     },
     "history": {
       "pass": 4,
@@ -24,37 +24,29 @@
       "fail": 3
     },
     "culture": {
-      "pass": 1,
-      "fail": 2
+      "pass": 2,
+      "fail": 1
     }
   },
   "by_difficulty": {
     "easy": {
-      "pass": 8,
-      "fail": 3
+      "pass": 10,
+      "fail": 1
     },
     "medium": {
-      "pass": 6,
-      "fail": 4
+      "pass": 8,
+      "fail": 2
     },
     "hard": {
       "pass": 4,
       "fail": 1
     },
     "edge": {
-      "pass": 1,
-      "fail": 3
+      "pass": 3,
+      "fail": 1
     }
   },
   "failures": [
-    {
-      "id": 1,
-      "domain": "botany",
-      "difficulty": "easy",
-      "claim": "apple tree | comes from | southern Kazakhstan",
-      "expected": "entailment",
-      "reasoning": "Directly stated in the first sentence of the document."
-    },
     {
       "id": 5,
       "domain": "production",
@@ -64,36 +56,12 @@
       "reasoning": "Directly stated production statistic (tuned for semantic alignment)."
     },
     {
-      "id": 9,
-      "domain": "culture",
-      "difficulty": "medium",
-      "claim": "Idunn | gives apples to | gods in Norse mythology",
-      "expected": "entailment",
-      "reasoning": "Requires connecting Idunn to Norse mythology context."
-    },
-    {
       "id": 10,
       "domain": "botany",
       "difficulty": "medium",
       "claim": "apple tree | is subfamily of | Rosaceae",
       "expected": "entailment",
       "reasoning": "Stated at end of document \u2014 requires reading to the family classification."
-    },
-    {
-      "id": 12,
-      "domain": "botany",
-      "difficulty": "medium",
-      "claim": "Malus domestica | is developed to grow in | colder climates",
-      "expected": "entailment",
-      "reasoning": "Requires connecting Malus sieversii usage to Malus domestica."
-    },
-    {
-      "id": 16,
-      "domain": "botany",
-      "difficulty": "easy",
-      "claim": "apple genome | was sequenced in | 2015",
-      "expected": "contradiction",
-      "reasoning": "Document says 2010, not 2015. Year swap."
     },
     {
       "id": 21,
@@ -118,22 +86,6 @@
       "claim": "total world apple production 2020-2021 | was | 80,522,000 metric tons",
       "expected": "entailment",
       "reasoning": "Exact numeric fact from the World Production section \u2014 tests number extraction."
-    },
-    {
-      "id": 29,
-      "domain": "botany",
-      "difficulty": "edge",
-      "claim": "apples and pears | are in the same | subfamily",
-      "expected": "entailment",
-      "reasoning": "Stated at the end: both in Maloideae \u2014 requires connecting two entities."
-    },
-    {
-      "id": 30,
-      "domain": "botany",
-      "difficulty": "edge",
-      "claim": "apple fruit | matures in | winter",
-      "expected": "contradiction",
-      "reasoning": "Document says autumn, not winter. Seasonal swap on a botanical fact."
     }
   ]
 }

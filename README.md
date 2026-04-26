@@ -81,12 +81,12 @@ The Cerberus benchmark evaluates the NLI-based verification gate using 30 divers
 
 | Metric | Value |
 | :--- | :--- |
-| **Overall Accuracy** | 63.3% |
-| Precision | 63.6% |
-| Recall | 50.0% |
-| F1 Score | 56.0% |
-| TP / TN / FP / FN | 7 / 12 / 4 / 7 |
-| Model used | DeBERTa-v3-small (Local NLI) |
+| **Overall Accuracy** | 83.3% |
+| Precision | 84.6% |
+| Recall | 78.6% |
+| F1 Score | 81.5% |
+| TP / TN / FP / FN | 11 / 14 / 2 / 3 |
+| Model used | DeBERTa-v3-base (Local NLI) |
 
 #### Performance by Difficulty
 - **Easy**: 72.7% (8/11)
@@ -160,7 +160,7 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 
 - **spaCy (en_core_web_sm)**: Source triple extraction and NLP preprocessing.
 - **GLiNER-relex (knowledgator/gliner-relex-large-v0.5)**: High-precision claim triple extraction from LLM responses.
-- **DeBERTa (cross-encoder/nli-deberta-v3-small)**: Local NLI verification for the Cerberus gate.
+- **DeBERTa (sileod/deberta-v3-base-tasksource-nli)**: Local NLI verification for the Cerberus gate.
 - **NetworkX**: Knowledge graph representation and PageRank algorithmic scoring.
 - **tiktoken**: Precise token budget enforcement for context management.
 - **SQLite (WAL mode)**: High-performance storage for L3 verified fact persistence.

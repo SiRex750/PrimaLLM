@@ -7,7 +7,7 @@ The Cerberus gate guards the HADES memory hierarchy — only NLI-verified facts 
 - Extracts claim triples from LLM-generated text using GLiNER-relex.
 - Builds a source-of-truth SourceGraph from ingested document triples (spaCy).
 - Computes SHA-256 per-triple checksums and a master document checksum.
-- Verifies each claim against the source graph using DeBERTa NLI (cross-encoder/nli-deberta-v3-small).
+- Verifies each claim against the source graph using DeBERTa NLI (sileod/deberta-v3-base-tasksource-nli).
 - Writes only ENTAILMENT-verified facts to L3 SQLite storage; discards CONTRADICTION and NEUTRAL claims.
 
 ## The Verification Pipeline
