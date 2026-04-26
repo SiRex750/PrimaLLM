@@ -59,21 +59,21 @@ The Apple Wiki benchmark tests the system's ability to preserve "long-tail" fact
 
 ### APPLE PDF (System-Wide Evaluation)
 
-The Apple PDF benchmark evaluates the end-to-end integration of the HADES pipeline—encompassing layout-aware extraction (`pymupdf4llm`), SVO Graph Construction, Dynamic L1 Cache Management, and L2 Vector Fallback.
+The Apple PDF benchmark evaluates the end-to-end integration of the HADES pipeline—encompassing layout-aware extraction (`pymupdf4llm`), SVO Graph Construction, Dynamic L1 Cache Management, and the new **Architectural Bypass**.
 
 | Dimension | Performance | Impact |
 | :--- | :--- | :--- |
-| **System Accuracy** | **80.0%** | Robust cross-domain recall |
-| **Information Density** | **86.2% reduction** | Optimal L1 token utilization |
-| **Temporal Precision** | High | Mitigation of historical hallucinations |
+| **System Accuracy (SLM 1.5B)** | **70.0%** | **Significant Jump** via Python-forced L2 routing |
+| **Information Density** | **87.3% reduction** | Optimal L1 token utilization |
+| **L2 Precision** | High | Resolved via **Cross-Encoder Re-ranking** |
 | **Entity Preservation** | High | Protection of long-tail proper nouns |
 
 **Architectural Innovations for Factual Grounding**:
 
-1.  **Temporal Harvesting (Metadata-Driven)**: To resolve the issue of "Orphaned Modifiers" in dependency parsing, HADES implements a secondary NER-driven scan. This identifies dates and times structurally distant from the root verb and stores them as `temporal_anchors` metadata. This ensures quantitative metrics are always anchored to their correct timeframe, preventing calculation hallucinations.
-2.  **Symmetric Multi-Objective Ranking**: The system utilizes a dual-path importance score that balances global graph centrality (PageRank) with semantic specificity (NER). By applying **Additive NER Boosting** (+0.1) to specific entity classes, HADES ensures that high-value "long-tail" facts co-exist with structural nodes without context flooding.
-3.  **Source-Grounded Citation**: To lock the SLM's attention to the provided context, HADES enforces a strict JSON response schema. The model must provide a `citation` (the exact SVO triple used) before it is permitted to generate the `answer`. Failure to output valid JSON or a valid citation triggers an automatic **Memory Fault**, forcing a fallback to the high-fidelity L2 memory.
-4.  **L1 Conflict Resolution (Collision Detection)**: The L1 Cache identifies triples with similar semantics but conflicting numeric data (e.g., varying production statistics). These facts are wrapped in an explicit `<SYSTEM_WARNING: CONFLICTING DATA>` block, alerting the policy model to resolve the ambiguity based on the precise wording of the user's query.
+1.  **Architectural Bypass & Dynamic Context Slicer**: To solve the "Confidence Bias" problem in smaller LLMs, HADES implements a Python-level arbitration layer. Using a **Cross-Encoder** (`ms-marco-MiniLM-L-6-v2`), the system automatically identifies when L1 context is irrelevant to the query and **forcefully routes** the request to L2 memory, bypassing the LLM's judgment. It then "slices" the context to include only the Top 3 most relevant facts.
+2.  **Cross-Encoder Re-ranking (Semantic Arbitration)**: L2 memory lookups now use a two-stage retrieval pipeline. A Bi-Encoder performs high-speed candidate fetch, followed by a Cross-Encoder that performs deep interaction scoring to distinguish between similar numeric facts (e.g., distinguishing "1607 arrival" from "1625 establishment").
+3.  **Temporal Harvesting (Metadata-Driven)**: To resolve the issue of "Orphaned Modifiers" in dependency parsing, HADES implements a secondary NER-driven scan. This identifies dates and times structurally distant from the root verb and stores them as `temporal_anchors` metadata. This ensures quantitative metrics are always anchored to their correct timeframe.
+4.  **L1 Conflict Resolution (Collision Detection)**: The L1 Cache identifies triples with similar semantics but conflicting numeric data. These facts are wrapped in an explicit `<SYSTEM_WARNING: CONFLICTING DATA>` block, alerting the policy model to resolve the ambiguity based on the precise wording of the query.
 
 ### CERBERUS (30-case NLI benchmark)
 
@@ -164,10 +164,10 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 - **NetworkX**: Knowledge graph representation and PageRank algorithmic scoring.
 - **tiktoken**: Precise token budget enforcement for context management.
 - **SQLite (WAL mode)**: High-performance storage for L3 verified fact persistence.
-- **sentence-transformers (all-MiniLM-L6-v2)**: L2 semantic search and embedding generation.
+- **sentence-transformers**: `all-MiniLM-L6-v2` (L2 retrieval) and `ms-marco-MiniLM-L-6-v2` (Cross-Encoder re-ranking).
 - **PyVis**: Interactive knowledge graph visualisation.
 - **Streamlit**: Web-based user interface.
-- **Ollama (qwen2.5:1.5b or phi-3-mini)**: Local SLM/LLM inference.
+- **Ollama**: Local SLM/LLM inference support for `qwen2.5:1.5b`, `phi3.5`, and `llama3.2:3b`.
 
 ## Citation / Academic Context
 

@@ -10,5 +10,4 @@ pymupdf4llm
 ollama>=0.1.0
 transformers>=4.35.0
 torch>=2.0.0
-openai
 python-dotenv

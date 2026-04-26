@@ -17,13 +17,18 @@ from shared.extractor import extract_claim_triples, extract_source_triples
 from shared.l3_memory import fetch_clean_facts, save_fact
 from shared.triple import KnowledgeTriple
 
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 
 
 @st.cache_resource
 def get_embedder():
     return SentenceTransformer('all-MiniLM-L6-v2')
+
+
+@st.cache_resource
+def get_cross_encoder():
+    return CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 
 
 st.set_page_config(
@@ -71,6 +76,9 @@ def _required_system_budget() -> int:
 
 def _init_session_state() -> None:
     desired_system_budget = _required_system_budget()
+
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = "qwen2.5:1.5b"
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -227,8 +235,11 @@ def _extract_search_keyword(content: str) -> str | None:
     return keyword or None
 
 
-def _build_partitioned_messages(cache: L1Cache, prompt: str) -> list[dict[str, str]]:
-    facts = [entry.text for entry in cache.set_facts.values()]
+def _build_partitioned_messages(cache: L1Cache, prompt: str, forced_facts: list[str] = None) -> list[dict[str, str]]:
+    if forced_facts is not None:
+        facts = forced_facts
+    else:
+        facts = [entry.text for entry in cache.set_facts.values()]
     
     # --- COLLISION DETECTION (CONTRASTIVE RANKING) ---
     # Identify facts with differing numerical values for the same subject/predicate
@@ -297,7 +308,7 @@ def _call_policy_model(messages: list[dict[str, str]]) -> str:
     request_messages.append({"role": "assistant", "content": ""})
 
     response = ollama.chat(
-        model=OLLAMA_MODEL,
+        model=st.session_state.get("selected_model", OLLAMA_MODEL),
         messages=request_messages,
         options=OLLAMA_OPTIONS,
     )
@@ -308,7 +319,11 @@ def _call_policy_model(messages: list[dict[str, str]]) -> str:
     return content
 
 
-def query_l2_memory(keyword: str, source_graph) -> str:
+def query_l2_memory(query: str, keyword: str, source_graph) -> str:
+    """
+    Search L2 memory using a Bi-Encoder for retrieval and a 
+    Cross-Encoder for precise semantic arbitration.
+    """
     if source_graph is None or not keyword:
         return ""
 
@@ -316,39 +331,40 @@ def query_l2_memory(keyword: str, source_graph) -> str:
     keyword_vector = embedder.encode(keyword)
     graph = source_graph.graph
 
-    best_node = None
-    best_score = -1.0
-
+    # Step A: Bi-Encoder Fetch (Top 5 Candidates)
+    node_scores = []
     for node, data in graph.nodes(data=True):
         if "vector" in data and data["vector"] is not None:
             node_vector = data["vector"]
-            # cosine_similarity expects 2D arrays
             sim = cosine_similarity([keyword_vector], [node_vector])[0][0]
-            if sim > best_score:
-                best_score = sim
-                best_node = node
-
-    if best_score < 0.60 or best_node is None:
+            node_scores.append((node, sim))
+    
+    # Sort and take top 5
+    top_nodes = sorted(node_scores, key=lambda x: x[1], reverse=True)[:5]
+    
+    if not top_nodes or top_nodes[0][1] < 0.35: # Lower threshold for initial retrieval
         return ""
 
-    edge_lines: list[str] = []
-    seen_edges: set[tuple[str, str, str]] = set()
+    candidate_facts = []
+    for node, _ in top_nodes:
+        # Collect facts from both out-edges and in-edges for the node
+        for subject, obj, data in list(graph.out_edges(node, data=True)) + list(graph.in_edges(node, data=True)):
+            verb = str((data or {}).get("verb", "is")).strip()
+            fact = f"{subject} {verb} {obj}".strip()
+            if fact not in candidate_facts:
+                candidate_facts.append(fact)
 
-    for subject, obj, data in graph.out_edges(best_node, data=True):
-        verb = str((data or {}).get("verb", "")).strip()
-        edge_key = (str(subject), verb, str(obj))
-        if edge_key not in seen_edges:
-            seen_edges.add(edge_key)
-            edge_lines.append(f"{subject} {verb} {obj}".strip())
+    if not candidate_facts:
+        return ""
 
-    for subject, obj, data in graph.in_edges(best_node, data=True):
-        verb = str((data or {}).get("verb", "")).strip()
-        edge_key = (str(subject), verb, str(obj))
-        if edge_key not in seen_edges:
-            seen_edges.add(edge_key)
-            edge_lines.append(f"{subject} {verb} {obj}".strip())
-
-    return " | ".join(edge_lines)
+    # Step B & C: Cross-Encoder Scoring & Arbitration
+    cross_encoder = get_cross_encoder()
+    pairs = [[query, fact] for fact in candidate_facts]
+    scores = cross_encoder.predict(pairs)
+    
+    # Step D: Return the single highest-scoring fact
+    best_idx = scores.argmax()
+    return candidate_facts[best_idx]
 
 
 def query_l3_wiki(keyword: str) -> str:
@@ -490,7 +506,7 @@ def process_pdf(file) -> tuple[int, int]:
         with st.spinner("Deep entity resolution running..."):
             source_graph.graph, extra_merges = normalise_entities_with_llm(
                 source_graph.graph,
-                ollama_model=OLLAMA_MODEL,
+                ollama_model=st.session_state.get("selected_model", OLLAMA_MODEL),
             )
         if extra_merges > 0:
             _push_telemetry_item(
@@ -557,6 +573,27 @@ def _render_sidebar() -> None:
             st.caption(f"> {fault}")
 
         st.divider()
+        st.markdown(
+            "<div class='telemetry-label'>Inference Model</div>",
+            unsafe_allow_html=True,
+        )
+        selected = st.selectbox(
+            label="model",
+            options=["qwen2.5:1.5b", "phi3.5", "llama3.2:3b"],
+            index=["qwen2.5:1.5b", "phi3.5", "llama3.2:3b"].index(
+                st.session_state.get("selected_model", "qwen2.5:1.5b")
+            ),
+            label_visibility="collapsed",
+            help=(
+                "qwen2.5:1.5b — fastest, best JSON compliance\n"
+                "phi3.5 — better reasoning, slower\n"
+                "llama3.2:3b — balanced, requires more RAM"
+            ),
+        )
+        if selected != st.session_state.get("selected_model"):
+            st.session_state.selected_model = selected
+            st.rerun()
+
         st.markdown(
             "<div class='telemetry-label'>Graph Options</div>",
             unsafe_allow_html=True,
@@ -683,16 +720,46 @@ def _chat_loop(prompt: str) -> str:
     source_graph = st.session_state.source_graph
 
     _inject_clean_facts_into_l1(cache)
-
     cache.add_history_turn("user", prompt)
-    conversation = _build_partitioned_messages(cache, prompt)
+
+    # --- ARCHITECTURAL BYPASS & DYNAMIC CONTEXT SLICER ---
+    active_facts = [entry.text for entry in cache.set_facts.values()]
+    forced_facts = []
+
+    if not active_facts:
+        # Automatically trigger L2 if L1 is empty
+        l2_result = query_l2_memory(prompt, prompt, source_graph)
+        if l2_result:
+            forced_facts = [l2_result]
+            _push_telemetry_item("memory_faults", f"AUTO L2 HIT (Empty L1) | {l2_result}")
+    else:
+        ce = get_cross_encoder()
+        pairs = [[prompt, f] for f in active_facts]
+        scores = ce.predict(pairs)
+        scored_facts = sorted(zip(active_facts, scores), key=lambda x: x[1], reverse=True)
+
+        if scored_facts[0][1] < 0.0:
+            # GATEKEEPER: No relevant fact in L1. Force L2 search.
+            l2_result = query_l2_memory(prompt, prompt, source_graph)
+            if l2_result:
+                forced_facts = [l2_result]
+                _push_telemetry_item("memory_faults", f"GATEKEEPER BYPASS -> L2 HIT | {l2_result}")
+            else:
+                forced_facts = []
+                _push_telemetry_item("memory_faults", "GATEKEEPER BYPASS -> L2 MISS")
+        else:
+            # SLICER: Keep only relevant facts, max 3.
+            forced_facts = [f for f, s in scored_facts if s > 0.0][:3]
+            _push_telemetry_item("memory_faults", f"SLICER ACTIVE: {len(forced_facts)} facts kept")
+
+    conversation = _build_partitioned_messages(cache, prompt, forced_facts=forced_facts)
     content = _call_policy_model(conversation)
+    
+    # Traditional tool-call handling is now a fallback
     keyword = _extract_search_keyword(content)
-
-    if keyword:
+    if keyword and not forced_facts: # Only if we didn't already bypass
         st.session_state.telemetry["tool_calls"] = st.session_state.telemetry.get("tool_calls", 0) + 1
-
-        l2_result = query_l2_memory(keyword, source_graph)
+        l2_result = query_l2_memory(prompt, keyword, source_graph)
         if l2_result:
             tool_output = l2_result
             fault_line = f"L2 HIT | keyword='{keyword}' | {l2_result}"

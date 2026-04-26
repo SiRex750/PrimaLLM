@@ -140,8 +140,32 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
     
-    # Build context from L1 with Collision Detection
-    messages = _build_partitioned_messages(cache, question)
+    # --- ARCHITECTURAL BYPASS & DYNAMIC CONTEXT SLICER ---
+    active_facts = [entry.text for entry in cache.set_facts.values()]
+    forced_facts = []
+
+    if not active_facts:
+        from app import query_l2_memory
+        l2_result = query_l2_memory(question, question, source_graph)
+        if l2_result:
+            forced_facts = [l2_result]
+    else:
+        from app import get_cross_encoder
+        ce = get_cross_encoder()
+        pairs = [[question, f] for f in active_facts]
+        scores = ce.predict(pairs)
+        scored_facts = sorted(zip(active_facts, scores), key=lambda x: x[1], reverse=True)
+
+        if scored_facts[0][1] < 0.0:
+            from app import query_l2_memory
+            l2_result = query_l2_memory(question, question, source_graph)
+            if l2_result:
+                forced_facts = [l2_result]
+        else:
+            forced_facts = [f for f, s in scored_facts if s > 0.0][:3]
+
+    # Build context from L1 with filtered/forced facts
+    messages = _build_partitioned_messages(cache, question, forced_facts=forced_facts)
     
     response = ollama.chat(
         model=OLLAMA_MODEL,
@@ -150,14 +174,12 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     )
     content = response['message']['content'].strip()
     
-    # Check for tool call
+    # Check for tool call (fallback if bypass wasn't used)
     match = re.search(r'"keyword":\s*"([^"]+)"', content)
-    if match:
+    if match and not forced_facts:
         keyword = match.group(1)
-        
-        # Query L2 graph
         from app import query_l2_memory
-        l2_result = query_l2_memory(keyword, source_graph)
+        l2_result = query_l2_memory(question, keyword, source_graph)
         
         if l2_result:
             messages.append({"role": "assistant", "content": content})
@@ -173,7 +195,6 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
         else:
             answer = "INSUFFICIENT DATA"
     else:
-        # Plain text answer
         answer = content
 
     caveman_tokens = count_tokens(cache.as_context_text())

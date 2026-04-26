@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-04-27T01:38:32.840676",
+  "timestamp": "2026-04-27T04:05:38.308258",
   "pdf": "Apple-1.pdf",
-  "accuracy": 0.5,
+  "accuracy": 0.7,
   "avg_reduction": 87.24608889992551,
   "avg_sdpt_improvement": 46.73880502145241,
   "raw_nodes": 27,
@@ -11,7 +11,7 @@
   "compression_target": "12.5%",
   "domain_stats": {
     "botany": {
-      "correct": 3,
+      "correct": 5,
       "total": 6
     },
     "production": {
@@ -31,8 +31,8 @@
     {
       "question": "Where does the apple tree originally come from?",
       "expected": "Kazakhstan",
-      "answer": "Asia and Europe used winter apples as an important food for thousands of years",
-      "is_correct": false,
+      "answer": "The apple tree originally comes from Kazakhstan, where a wild Malus sieversii apple was first cultivated thousands of years ago.",
+      "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
       "caveman_tokens": 528,
@@ -43,7 +43,7 @@
     {
       "question": "What is the scientific name of the wild ancestor of apple trees?",
       "expected": "Malus sieversii",
-      "answer": "Malus sieversii",
+      "answer": "Wild Malus sieversii apple in Kazakhstan was the earliest tree to be cultivated (Context: thousands of years)",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -55,7 +55,7 @@
     {
       "question": "What percentage of global apple production does China account for in 2013?",
       "expected": "49%",
-      "answer": "90.8 million tonnes / 80,522,000 metric tons * 100 = 114.6%",
+      "answer": "China accounts for **54.6%** of the global apple production in 2013.",
       "is_correct": false,
       "domain": "production",
       "raw_tokens": 4027,
@@ -67,7 +67,7 @@
     {
       "question": "How many known variants of apples are there?",
       "expected": "10000",
-      "answer": "There is one large collection of over 2,100 apple variants at the National Fruit Collection in England.",
+      "answer": "One large collection of over 2,100 apple variants is at the National Fruit Collection in England.",
       "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -79,7 +79,7 @@
     {
       "question": "What chemical in apple seeds can release cyanide?",
       "expected": "amygdalin",
-      "answer": "Amygdalin",
+      "answer": "Apples contain amygdalin, which can release cyanide when digested.",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -91,7 +91,7 @@
     {
       "question": "When was the first apple orchard in North America established?",
       "expected": "1625",
-      "answer": "The first apple orchard in North America was established in Virginia, United States. This orchard was founded by Captain John Smith and his men during their exploration of the region in the early 1600s. The establishment of this orchard marked the beginning of the cultivation of apples in what would later become the United States.",
+      "answer": "The first apple orchard in North America was established in 1607, near Jamestown, Virginia.",
       "is_correct": false,
       "domain": "history",
       "raw_tokens": 4027,
@@ -103,7 +103,7 @@
     {
       "question": "Who wrote the Prose Edda that mentions the goddess Idunn?",
       "expected": "Snorri Sturluson",
-      "answer": "The goddess I\u00f0unn was mentioned in the Prose Edda, which is a collection of Norse tales written by Snorri Sturluson in the 13th century.",
+      "answer": "The Prose Edda, which contains the story of I\u00f0unn and her apples, was written by Snorri Sturluson in the 13th century.",
       "is_correct": true,
       "domain": "culture",
       "raw_tokens": 4027,
@@ -115,7 +115,7 @@
     {
       "question": "What is the scientific name of the cultivated apple species?",
       "expected": "Malus domestica",
-      "answer": "Malus domestica",
+      "answer": "The scientific name of the cultivated apple species is **Malus domestica**.",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -139,8 +139,8 @@
     {
       "question": "In which plant family are apples classified?",
       "expected": "Rosaceae",
-      "answer": "Maloideae",
-      "is_correct": false,
+      "answer": "In the plant kingdom, apples belong to the family Rosaceae. Within this family, they are specifically categorized under the subfamily Rosoideae and genus Malus. Among the various species of Malus, the most common one grown by humans is the Malus domestica variety, which includes apples like Gala, Fuji, and Golden Delicious.",
+      "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
       "caveman_tokens": 510,
