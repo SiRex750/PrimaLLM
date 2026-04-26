@@ -138,7 +138,7 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     from caveman.benchmark.run_benchmark import count_tokens
     import ollama, json, re
     
-    OLLAMA_MODEL = "qwen2.5:1.5b"
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
     
     # Build context from L1 with Collision Detection
     messages = _build_partitioned_messages(cache, question)
