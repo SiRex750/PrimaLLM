@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-04-27T01:28:09.090796",
+  "timestamp": "2026-04-27T01:38:32.840676",
   "pdf": "Apple-1.pdf",
-  "accuracy": 0.6,
-  "avg_reduction": 86.71964241370748,
-  "avg_sdpt_improvement": 45.98708088352137,
+  "accuracy": 0.5,
+  "avg_reduction": 87.24608889992551,
+  "avg_sdpt_improvement": 46.73880502145241,
   "raw_nodes": 27,
   "final_nodes": 26,
   "l1_budget_used": 503,
@@ -11,7 +11,7 @@
   "compression_target": "12.5%",
   "domain_stats": {
     "botany": {
-      "correct": 4,
+      "correct": 3,
       "total": 6
     },
     "production": {
@@ -31,14 +31,14 @@
     {
       "question": "Where does the apple tree originally come from?",
       "expected": "Kazakhstan",
-      "answer": "Asia and Europe",
+      "answer": "Asia and Europe used winter apples as an important food for thousands of years",
       "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 528,
+      "reduction": 86.88850260740006,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.20689655172414
     },
     {
       "question": "What is the scientific name of the wild ancestor of apple trees?",
@@ -47,70 +47,70 @@
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 528,
+      "reduction": 86.88850260740006,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.20689655172414
     },
     {
       "question": "What percentage of global apple production does China account for in 2013?",
       "expected": "49%",
-      "answer": "China accounts for approximately 46.5% (or about 41,789,000 metric tons) of the world's total apple production in 2013.",
+      "answer": "90.8 million tonnes / 80,522,000 metric tons * 100 = 114.6%",
       "is_correct": false,
       "domain": "production",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "How many known variants of apples are there?",
       "expected": "10000",
-      "answer": "There are over 2,100 apple varieties in a collection at the National Fruit Collection in England.",
+      "answer": "There is one large collection of over 2,100 apple variants at the National Fruit Collection in England.",
       "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "What chemical in apple seeds can release cyanide?",
       "expected": "amygdalin",
-      "answer": "Amygdalin, which can release cyanide when digested.",
+      "answer": "Amygdalin",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "When was the first apple orchard in North America established?",
       "expected": "1625",
-      "answer": "The first apple orchard in North America was established by Europeans when they arrived around 100 years after Columbus.",
+      "answer": "The first apple orchard in North America was established in Virginia, United States. This orchard was founded by Captain John Smith and his men during their exploration of the region in the early 1600s. The establishment of this orchard marked the beginning of the cultivation of apples in what would later become the United States.",
       "is_correct": false,
       "domain": "history",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "Who wrote the Prose Edda that mentions the goddess Idunn?",
       "expected": "Snorri Sturluson",
-      "answer": "Snorri Sturluson wrote the Prose Edda, which includes the mention of the goddess I\u00f0unn giving apples to the gods.",
+      "answer": "The goddess I\u00f0unn was mentioned in the Prose Edda, which is a collection of Norse tales written by Snorri Sturluson in the 13th century.",
       "is_correct": true,
       "domain": "culture",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "What is the scientific name of the cultivated apple species?",
@@ -119,10 +119,10 @@
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "What was the total worldwide apple production in 2013?",
@@ -131,22 +131,22 @@
       "is_correct": true,
       "domain": "production",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     },
     {
       "question": "In which plant family are apples classified?",
       "expected": "Rosaceae",
-      "answer": "Apples are classified in the subfamily Maloideae, which is part of the family Rosaceae.",
-      "is_correct": true,
+      "answer": "Maloideae",
+      "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 531,
-      "reduction": 86.8140054631239,
+      "caveman_tokens": 510,
+      "reduction": 87.33548547305686,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.964285714285715
+      "caveman_sdpt": 18.214285714285715
     }
   ]
 }
