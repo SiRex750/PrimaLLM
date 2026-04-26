@@ -37,30 +37,28 @@ st.set_page_config(
 SYSTEM_INSTRUCTION = """You are the HADES NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. 
 You do not converse. You do not explain your thoughts. 
 
-You have two operating modes. You MUST output ONLY the mode's payload, NEVER the mode name itself.
+You MUST output ONLY a valid JSON object matching the schemas below.
 
 1. CACHE HIT (Answer Synthesis):
-   If the L1 Cache (Context) contains the answer to the user's query, output the final answer directly.
-   
+   If the L1 Cache (Context) contains the answer, you must cite the exact triple you used.
+   Output schema:
+   {
+       "citation": "[Subject] [Verb] [Object]",
+       "answer": "Your concise answer based on that triple."
+   }
+
 2. CACHE MISS (Memory Fault):
-   If the answer is NOT in the L1 Cache, you MUST trigger an L2 Page Fault by outputting STRICTLY a JSON object matching this schema. Do not output any text before or after the JSON:
-{
-    "tool": "search_memory",
-    "keyword": "exact_semantic_keyword_to_search"
-}
+   If the answer is NOT in the L1 Cache, you MUST output exactly:
+   {
+       "tool": "search_memory",
+       "keyword": "exact_semantic_keyword_to_search"
+   }
 
-Examples:
-Input: "What year did the French Revolution begin?"
-Assistant: "The French Revolution began in 1789."
-
-Input: "Who founded Microsoft?"
-Assistant: {"tool": "search_memory", "keyword": "Microsoft founder"}
-
-Input: "What is the boiling point of nitrogen?" (If not in L1 Cache)
-Assistant: {"tool": "search_memory", "keyword": "nitrogen boiling point"}
-
-[SYSTEM: TOOL RESULT: No memory hit for keyword]
-Assistant: INSUFFICIENT DATA. The source document does not contain this information."""
+Constraints:
+- You MUST cite a triple from the 'Facts' section for every CACHE HIT.
+- If you cannot find a valid triple to cite, you MUST output the CACHE MISS JSON.
+- DO NOT output any text before or after the JSON. 
+- Failure to output valid JSON triggers an automatic Memory Fault."""
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 OLLAMA_OPTIONS = {
@@ -236,7 +234,46 @@ def _extract_search_keyword(content: str) -> str | None:
 
 def _build_partitioned_messages(cache: L1Cache, prompt: str) -> list[dict[str, str]]:
     facts = [entry.text for entry in cache.set_facts.values()]
-    facts_block = "\n".join(f"- {fact}" for fact in facts) if facts else "<empty>"
+    
+    # --- COLLISION DETECTION (CONTRASTIVE RANKING) ---
+    # Identify facts with differing numerical values for the same subject/predicate
+    import re
+    numbers_map = {}
+    collisions = []
+    
+    for f in facts:
+        # Extract numbers (integers or decimals)
+        nums = re.findall(r'\b\d+(?:[\.,]\d+)*\b', f)
+        if nums:
+            # Create a 'semantic key' by removing numbers from the fact
+            key = re.sub(r'\b\d+(?:[\.,]\d+)*\b', 'NUM', f).strip().lower()
+            if key not in numbers_map:
+                numbers_map[key] = []
+            numbers_map[key].append(f)
+            
+    for key, related_facts in numbers_map.items():
+        if len(related_facts) > 1:
+            # Check if numbers actually differ
+            all_nums = [set(re.findall(r'\b\d+(?:[\.,]\d+)*\b', rf)) for rf in related_facts]
+            if any(n != all_nums[0] for n in all_nums):
+                collisions.append(related_facts)
+
+    facts_block = ""
+    if collisions:
+        facts_block += "<SYSTEM_WARNING: CONFLICTING DATA>\n"
+        for group in collisions:
+            for cf in group:
+                facts_block += f"- {cf}\n"
+        facts_block += "Caution: Multiple numerical counts exist. Resolve based on the precise wording of the query.\n"
+        facts_block += "</SYSTEM_WARNING>\n\n"
+    
+    # Add non-colliding facts
+    collided_set = {f for group in collisions for f in group}
+    remaining_facts = [f for f in facts if f not in collided_set]
+    facts_block += "\n".join(f"- {fact}" for fact in remaining_facts) if remaining_facts else ""
+    if not facts_block:
+        facts_block = "<empty>"
+    # -------------------------------------------------
 
     user_turns = [turn.text for turn in cache.set_history if turn.role == "user"]
     last_two_user_turns = user_turns[-2:]
@@ -669,6 +706,18 @@ def _chat_loop(prompt: str) -> str:
             content = _call_policy_model(conversation)
             keyword = _extract_search_keyword(content)
 
+    keyword = None
+    try:
+        parsed_initial = json.loads(content)
+        if parsed_initial.get("tool") == "search_memory":
+            keyword = str(parsed_initial.get("keyword", "")).strip()
+    except json.JSONDecodeError:
+        # FORCE FAULT: If model failed to output JSON, assume context wasn't clear enough
+        # Extract a keyword from the prompt instead
+        keyword = prompt.replace("?", "").split()[-3:]
+        keyword = " ".join(keyword)
+        _push_telemetry_item("memory_faults", f"JSON FAULT | Triggering L2 for keyword: {keyword}")
+
     if keyword:
         st.session_state.telemetry["tool_calls"] = st.session_state.telemetry.get("tool_calls", 0) + 1
 
@@ -694,17 +743,30 @@ def _chat_loop(prompt: str) -> str:
             "content": (
                 f"TOOL RESULT: {tool_output}\n\n"
                 "COMMAND: Search complete. You MUST synthesize the final answer now "
-                "using ONLY the tool result above. DO NOT output JSON. DO NOT call "
-                "search_memory again. If the result is empty, reply with "
-                "'INSUFFICIENT DATA'."
+                "using the tool result above. Output schema:\n"
+                "{\"citation\": \"Triple from context\", \"answer\": \"...\"}\n"
+                "If the result is empty, reply with 'INSUFFICIENT DATA'."
             ),
         })
 
-        final_answer = _call_policy_model(conversation)
-        if not final_answer:
-            final_answer = "Data retrieved from L2 Memory, but generation failed."
+        final_raw = _call_policy_model(conversation)
+        try:
+            parsed = json.loads(final_raw)
+            final_answer = parsed.get("answer", final_raw)
+            citation = parsed.get("citation", "none")
+            _push_telemetry_item("sentinel_log", f"Refined citation: {citation}")
+        except json.JSONDecodeError:
+            final_answer = final_raw
     else:
-        final_answer = content
+        # CACHE HIT case
+        try:
+            parsed = json.loads(content)
+            final_answer = parsed.get("answer", content)
+            citation = parsed.get("citation", "none")
+            _push_telemetry_item("sentinel_log", f"L1 Citation: {citation}")
+        except json.JSONDecodeError:
+            # Should be unreachable due to the initial JSON_FAULT logic, but for safety:
+            final_answer = content
 
     cache.add_history_turn("assistant", final_answer)
     return final_answer

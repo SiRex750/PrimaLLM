@@ -135,19 +135,48 @@ APPLE_QA_CASES = [
 
 def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     from caveman.benchmark.run_benchmark import count_tokens
-    import ollama
+    import ollama, json, re
     
     OLLAMA_MODEL = "qwen2.5:1.5b"
     
-    # Build context from L1
+    # Build context from L1 with Collision Detection
     facts = [entry.text for entry in cache.active_facts.values()]
-    facts_block = '\n'.join(f'- {f}' for f in facts) or '<empty>'
+    
+    numbers_map = {}
+    collisions = []
+    for f in facts:
+        nums = re.findall(r'\b\d+(?:[\.,]\d+)*\b', f)
+        if nums:
+            key = re.sub(r'\b\d+(?:[\.,]\d+)*\b', 'NUM', f).strip().lower()
+            if key not in numbers_map:
+                numbers_map[key] = []
+            numbers_map[key].append(f)
+            
+    for key, related_facts in numbers_map.items():
+        if len(related_facts) > 1:
+            all_nums = [set(re.findall(r'\b\d+(?:[\.,]\d+)*\b', rf)) for rf in related_facts]
+            if any(n != all_nums[0] for n in all_nums):
+                collisions.append(related_facts)
+
+    facts_block = ""
+    if collisions:
+        facts_block += "<SYSTEM_WARNING: CONFLICTING DATA>\n"
+        for group in collisions:
+            for cf in group:
+                facts_block += f"- {cf}\n"
+        facts_block += "Caution: Multiple numerical counts exist. Resolve based on query.\n"
+        facts_block += "</SYSTEM_WARNING>\n\n"
+    
+    collided_set = {f for group in collisions for f in group}
+    remaining_facts = [f for f in facts if f not in collided_set]
+    facts_block += "\n".join(f"- {fact}" for fact in remaining_facts) if remaining_facts else ""
+    if not facts_block: facts_block = "<empty>"
     
     messages = [
         {"role": "system", "content": 
-         "You are a factual QA system. Answer ONLY from the "
-         "provided facts. If the answer is not in the facts, "
-         "output exactly: CACHE_MISS"},
+         "You MUST output ONLY valid JSON matching schema: "
+         "{\"citation\": \"...\", \"answer\": \"...\"} or "
+         "{\"tool\": \"search_memory\", \"keyword\": \"...\"}"},
         {"role": "user", "content": 
          f"Facts:\n{facts_block}\n\nQuestion: {question}"}
     ]
@@ -157,30 +186,42 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
         messages=messages,
         options={"temperature": 0.0, "num_predict": 200}
     )
-    answer = response['message']['content'].strip()
+    content = response['message']['content'].strip()
     
-    # If Cache Miss, query L2
-    if 'CACHE_MISS' in answer or len(answer) < 10:
-        # Extract keyword from question
+    keyword = None
+    try:
+        parsed_initial = json.loads(content)
+        if parsed_initial.get("tool") == "search_memory":
+            keyword = str(parsed_initial.get("keyword", "")).strip()
+    except json.JSONDecodeError:
+        # JSON FAULT: Trigger L2
         keyword = question.replace('?', '').split()[-3:]
         keyword = ' '.join(keyword)
-        
-        # Query L2 graph
+    
+    if keyword:
         from app import query_l2_memory
         l2_result = query_l2_memory(keyword, source_graph)
         
         if l2_result:
-            messages.append({"role": "assistant", "content": answer})
+            messages.append({"role": "assistant", "content": content})
             messages.append({"role": "user", "content": 
                 f"Additional context from memory: {l2_result}\n"
-                f"Now answer: {question}"})
+                f"Now answer in JSON format with citation: {question}"})
             response2 = ollama.chat(
                 model=OLLAMA_MODEL,
                 messages=messages,
                 options={"temperature": 0.0, "num_predict": 200}
             )
-            answer = response2['message']['content'].strip()
+            content = response2['message']['content'].strip()
     
+    try:
+        parsed = json.loads(content)
+        answer = parsed.get("answer", content)
+    except:
+        # Fallback for mangled JSON
+        match = re.search(r'"answer":\s*"([^"]+)"', content)
+        answer = match.group(1) if match else content
+
     caveman_tokens = count_tokens(facts_block)
     return answer, caveman_tokens
 

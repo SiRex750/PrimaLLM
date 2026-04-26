@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-04-26T23:37:24.902588",
+  "timestamp": "2026-04-27T00:06:23.582318",
   "pdf": "Apple-1.pdf",
-  "accuracy": 0.7,
-  "avg_reduction": 86.34219021604171,
-  "avg_sdpt_improvement": 45.9860956618465,
-  "raw_nodes": 25,
-  "final_nodes": 24,
+  "accuracy": 0.6,
+  "avg_reduction": 86.71964241370748,
+  "avg_sdpt_improvement": 45.98708088352137,
+  "raw_nodes": 27,
+  "final_nodes": 26,
   "l1_budget_used": 503,
   "document_raw_tokens": 4027,
   "compression_target": "12.5%",
   "domain_stats": {
     "botany": {
-      "correct": 5,
+      "correct": 4,
       "total": 6
     },
     "production": {
@@ -31,8 +31,8 @@
     {
       "question": "Where does the apple tree originally come from?",
       "expected": "Kazakhstan",
-      "answer": "The first apple of the world was born in Kazakhstan. Wild Malus sieversii apple, which is native to Central Asia, including Kazakhstan, was the earliest tree cultivated by humans. This suggests that the apple tree originated in this region and spread from there.",
-      "is_correct": true,
+      "answer": "The information provided does not specify where the original apple tree came from.",
+      "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
       "caveman_tokens": 550,
@@ -43,7 +43,7 @@
     {
       "question": "What is the scientific name of the wild ancestor of apple trees?",
       "expected": "Malus sieversii",
-      "answer": "The scientific name of the wild ancestor of apple trees is Malus sieversii.",
+      "answer": "Malus sieversii",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -55,62 +55,62 @@
     {
       "question": "What percentage of global apple production does China account for in 2013?",
       "expected": "49%",
-      "answer": "China accounted for approximately 54.9% (or about 54,900,000 metric tons) of the total world production of apples in 2013.",
+      "answer": "51.4%",
       "is_correct": false,
       "domain": "production",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "How many known variants of apples are there?",
       "expected": "10000",
-      "answer": "There are over 2,100 apple varieties in total at the National Fruit Collection in England.",
+      "answer": "There is a large collection of over 2,100 apple variants at the National Fruit Collection in England.",
       "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "What chemical in apple seeds can release cyanide?",
       "expected": "amygdalin",
-      "answer": "The chemical amygdalin found in apple seeds can release cyanide when digested.",
+      "answer": "Amygdalin",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "When was the first apple orchard in North America established?",
       "expected": "1625",
-      "answer": "The first apple orchard in North America was established when Europeans arrived. This occurred from when Europeans arrived apples as food, which is around 1492 according to historical records.",
+      "answer": "1607",
       "is_correct": false,
       "domain": "history",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "Who wrote the Prose Edda that mentions the goddess Idunn?",
       "expected": "Snorri Sturluson",
-      "answer": "Snorri Sturluson wrote the Prose Edda, which includes the mention of the goddess I\u00f0unn giving apples to the gods.",
+      "answer": "Snorri Sturluson",
       "is_correct": true,
       "domain": "culture",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "What is the scientific name of the cultivated apple species?",
@@ -119,34 +119,34 @@
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "What was the total worldwide apple production in 2013?",
       "expected": "90.8 million tonnes",
-      "answer": "The total worldwide apple production in 2013 was 90.8 million tonnes.",
+      "answer": "90.8 million tonnes",
       "is_correct": true,
       "domain": "production",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     },
     {
       "question": "In which plant family are apples classified?",
       "expected": "Rosaceae",
-      "answer": "Apples are classified in the subfamily Maloideae within the family Rosaceae.",
+      "answer": "Rosaceae",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
-      "caveman_tokens": 550,
-      "reduction": 86.34219021604171,
+      "caveman_tokens": 531,
+      "reduction": 86.8140054631239,
       "baseline_sdpt": 64.95161290322581,
-      "caveman_sdpt": 18.96551724137931
+      "caveman_sdpt": 18.964285714285715
     }
   ]
 }

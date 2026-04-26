@@ -204,17 +204,24 @@ class L1Cache:
         
         # Aggressive L1 Filtering: Identify temporal/numeric context of the query
         import re
-        query_years = set(re.findall(r'\b(19|20)\d{2}\b', query))
+        query_years = set(re.findall(r'\b(?:19|20)\d{2}\b', query))
         query_numbers = set(re.findall(r'\b\d+(?:[\.,]\d+)?%?\b', query))
         has_query_stats = bool(query_years or query_numbers)
 
         to_delete = []
         for key, entry in self.set_facts.items():
             fact_text = entry.text
+            triple = entry.triple
             
             # Hard Temporal Exclusion: If query has a year, 
-            # purge facts with DIFFERENT years to starve SLM hallucinations
-            fact_years = set(re.findall(r'\b(19|20)\d{2}\b', fact_text))
+            # purge facts with DIFFERENT years in metadata to starve SLM hallucinations
+            fact_years = set()
+            for anchor in triple.temporal_anchors:
+                fact_years.update(re.findall(r'\b(?:19|20)\d{2}\b', anchor))
+            
+            # Also check text just in case extraction missed something or for legacy compatibility
+            fact_years.update(re.findall(r'\b(?:19|20)\d{2}\b', fact_text))
+            
             if query_years and fact_years and not (fact_years & query_years):
                 to_delete.append(key)
                 continue
