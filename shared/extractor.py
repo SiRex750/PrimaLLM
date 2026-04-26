@@ -60,6 +60,23 @@ def extract_source_triples(text: str) -> list[KnowledgeTriple]:
         obj = _find_object(sent, verb_token)
 
         if subject and verb and obj:
+            # --- TEMPORAL HARVESTING ---
+            # Grab any dates/times in the sentence that the dependency parser missed
+            combined_triple_text = f"{subject} {verb} {obj}".lower()
+            orphaned_dates = []
+            
+            for ent in sent.ents:
+                if ent.label_ in {"DATE", "TIME"}:
+                    # Only add the date if it isn't already somewhere in the extracted triple
+                    if ent.text.lower() not in combined_triple_text:
+                        orphaned_dates.append(ent.text.strip())
+            
+            # Bundle orphaned temporal anchors to the end of the object
+            if orphaned_dates:
+                date_str = " ".join(orphaned_dates)
+                obj = f"{obj} (in {date_str})"
+            # ------------------------------------
+
             # Move leading preposition from object to verb for cleaner nodes
             # e.g., (apple, born, in Kazakhstan) -> (apple, born in, Kazakhstan)
             PREPOSITIONS = {

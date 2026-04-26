@@ -201,15 +201,50 @@ class L1Cache:
         import numpy as np
 
         query_vec = embedder.encode(query).reshape(1, -1)
+        
+        # Aggressive L1 Filtering: Identify temporal/numeric context of the query
+        import re
+        query_years = set(re.findall(r'\b(19|20)\d{2}\b', query))
+        query_numbers = set(re.findall(r'\b\d+(?:[\.,]\d+)?%?\b', query))
+        has_query_stats = bool(query_years or query_numbers)
 
+        to_delete = []
         for key, entry in self.set_facts.items():
-            fact_vec = embedder.encode(entry.text).reshape(1, -1)
+            fact_text = entry.text
+            
+            # Hard Temporal Exclusion: If query has a year, 
+            # purge facts with DIFFERENT years to starve SLM hallucinations
+            fact_years = set(re.findall(r'\b(19|20)\d{2}\b', fact_text))
+            if query_years and fact_years and not (fact_years & query_years):
+                to_delete.append(key)
+                continue
+
+            fact_vec = embedder.encode(fact_text).reshape(1, -1)
             similarity = float(cos_sim(query_vec, fact_vec)[0][0])
-            # Blend structural importance with query relevance
+            
+            # Numeric/Temporal Filtering Logic
+            stat_penalty = 1.0
+            fact_numbers = set(re.findall(r'\b\d+(?:[\.,]\d+)?%?\b', fact_text))
+            
+            if has_query_stats:
+                # Penalize facts with different numbers (if not already purged by year)
+                mismatched_numbers = fact_numbers - query_numbers
+                if mismatched_numbers:
+                    stat_penalty = 0.05
+            else:
+                # If query is general (no numbers), penalize ANY facts with numbers
+                if fact_years or fact_numbers:
+                    stat_penalty = 0.2
+
+            # Blend structural importance, query relevance, and stat filter
             entry.pagerank_score = (
-                alpha * entry.pagerank_score
-                + (1.0 - alpha) * similarity
+                (alpha * entry.pagerank_score + (1.0 - alpha) * similarity) 
+                * stat_penalty
             )
+
+        # Immediate Purge
+        for key in to_delete:
+            del self.set_facts[key]
 
         # Re-trim with updated scores so highest-relevance facts survive
         self._trim_facts_to_budget()

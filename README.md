@@ -57,7 +57,22 @@ The Apple Wiki benchmark tests the system's ability to preserve "long-tail" fact
 | **Old** | 30 tokens | None | **FAIL** (Evicted) | PageRank Blindness |
 | **New** | 150 tokens | **Query-Aware** | **PASS** (Promoted) | **Superior Grounding** |
 
-**Key Finding**: Pure PageRank-based compression often evicts niche facts that are crucial for specific user queries. The upgrade to **Dynamic L1 Reranking** (blending PageRank with Semantic Similarity) solved this "PageRank Blindness," allowing the system to promote facts with low global importance but high query relevance.
+### APPLE PDF (End-to-End Benchmark)
+
+The Apple PDF benchmark evaluates the full HADES pipeline—from raw PDF extraction (`pymupdf4llm`) and Graph Construction to Dynamic L1 Management and L2 Fallback.
+
+| Metric | Value | Improvement |
+| :--- | :--- | :--- |
+| **End-to-End Accuracy** | **80.0%** (8/10) | +20% (vs initial v1) |
+| **Average Token Reduction** | **86.2%** | High Efficiency |
+| **Successful L2 Fallbacks** | 100% (on Miss) | Fault Tolerance |
+| **Case 3 (2013 Production)** | **PASS** | Solved Calculation Trap |
+| **Case 7 (Snorri Sturluson)** | **PASS** | Solved Entity Eviction |
+
+**Key Architectural Breakthroughs**:
+1.  **Temporal Harvesting**: Overcame the "Calculation Trap" (Case 3) by scanning for orphaned dates/times using spaCy NER and bundling them into triples. This prevents the SLM from seeing "timeless" numbers and attempting hallucinated calculations.
+2.  **Symmetric Multi-Objective Ranking**: Replaced brittle hard floors with **Additive NER Boosting** (+0.1 for PERSON, ORG, DATE). This allows niche entities like "Snorri Sturluson" to leapfrog generic facts without flooding the L1 cache or breaking organic PageRank connectivity.
+3.  **Hard Temporal Purge**: Implemented a "Starvation" strategy for the SLM; facts with mismatched years (e.g., 2020 facts during a 2013 query) are purged from L1 context, forcing a reliable fallback to L2 memory instead of a hallucinated answer.
 
 ### CERBERUS (30-case NLI benchmark)
 

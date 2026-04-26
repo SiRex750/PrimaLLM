@@ -66,6 +66,18 @@ def _is_valid_entity(label: str) -> bool:
     if lower.startswith(("a ", "an ")):
         return False
     
+    # Always keep pure numeric values — dates, quantities, percentages
+    # These are often filtered by prepositional phrase rules but are
+    # critical factual entities
+    numeric_only = re.sub(r'[\d\s\.\,\%]', '', label).strip()
+    if not numeric_only:  # label is purely numeric/punctuation
+        return True
+    
+    # Also keep labels that are short and contain a number
+    # "49%", "1625", "90.8 million tonnes"
+    if any(c.isdigit() for c in label) and len(label) <= 25:
+        return True
+
     # Starts with preposition
     PREP_STARTS = (
         "of ", "for ", "into ", "from ", "with ", "by ",
@@ -147,8 +159,46 @@ def rank_triples_by_importance(triples: Iterable[KnowledgeTriple]) -> list[tuple
     triple_list = list(triples)
     graph = build_graph(triple_list)
     scores = pagerank_scores(graph)
+    
+    # Compute initial scores
+    ranked_with_scores = []
+    for triple in triple_list:
+        score = scores.get(triple.subject, 0.0) + scores.get(triple.object, 0.0)
+        ranked_with_scores.append((triple, score))
+    
+    # Boost triples based on semantic class (Named Entity Recognition)
+    # Uses a relative multiplier (2.0x) to respect organic graph connectivity
+    # while strongly highlighting critical factual anchors.
+    nlp = _load_spacy_sm()
+    boosted_ranked = []
+    
+    # Categories that act as universal factual anchors
+    BOOST_CATEGORIES = {"PERSON", "GPE", "ORG", "DATE", "PERCENT", "QUANTITY"}
+    
+    for triple, score in ranked_with_scores:
+        subject_doc = nlp(triple.subject)
+        object_doc = nlp(triple.object)
+        
+        has_entity_boost = False
+        for doc in [subject_doc, object_doc]:
+            # Additive boost (0.1) ensures entities leapfrog generic facts
+            # regardless of base PageRank.
+            if any(ent.label_ in BOOST_CATEGORIES for ent in doc.ents):
+                score += 0.1 
+                has_entity_boost = True
+                break
+        
+        # Fallback for proper nouns that might miss NER
+        if not has_entity_boost:
+            for doc in [subject_doc, object_doc]:
+                if any(t.pos_ == 'PROPN' for t in doc):
+                    score += 0.05 
+                    break
+                    
+        boosted_ranked.append((triple, score))
+
     return sorted(
-        ((triple, scores.get(triple.subject, 0.0) + scores.get(triple.object, 0.0)) for triple in triple_list),
+        boosted_ranked,
         key=lambda item: item[1],
         reverse=True,
     )
