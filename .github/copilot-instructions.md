@@ -1,19 +1,19 @@
-# PrimaLLM Copilot Instructions
+# HADES Copilot Instructions
 
-You are helping maintain PrimaLLM as a two-path research repo.
+You are helping maintain HADES (Hierarchical Adaptive Document Encoding System) as a two-path research repo.
 
 ## Project Structure
 - `shared/` is the single source of truth for reusable logic.
-- `caveman/` is Path A: compression, PageRank scoring, and L1 context handling.
-- `sentinel/` is Path B: source-graph verification and L3 persistence.
+- `caveman/` (Charon) is Path A: compression, PageRank scoring, and L1 context handling.
+- `sentinel/` (Cerberus) is Path B: source-graph verification and L3 persistence.
 
 ## Non-Negotiable Rules
 - Local-only extraction: use spaCy with `en_core_web_sm` for all SVO triple extraction.
 - Local-only verification: use `cross-encoder/nli-deberta-v3-small` for all NLI checks.
 - No GPT for extraction.
 - No GPT for verification.
-- Sentinel verifies claims against a pre-ingested source graph, not against previous AI responses.
-- Shared logic must come from `shared/`, not duplicated in Caveman or Sentinel.
+- Cerberus verifies claims against a pre-ingested source graph, not against previous AI responses.
+- Shared logic must come from `shared/`, not duplicated in Charon (caveman/) or Cerberus (sentinel/).
 - Treat the legacy root-level prototype files as deprecated; prefer the package layout under `shared/`, `caveman/`, and `sentinel/`.
 
 ## Ownership Map

@@ -29,13 +29,13 @@ def get_embedder():
 
 st.set_page_config(
     layout="wide",
-    page_title="PrimaLLM",
+    page_title="HADES",
     page_icon="🧠",
     initial_sidebar_state="expanded",
 )
 
 
-SYSTEM_INSTRUCTION = """You are the NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. 
+SYSTEM_INSTRUCTION = """You are the HADES NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. 
 You do not converse. You do not explain your thoughts. 
 
 You have two operating modes. You MUST output ONLY the mode's payload, NEVER the mode name itself.
@@ -403,7 +403,7 @@ def _render_sidebar() -> None:
      letter-spacing:0.12em; color:#4d9fff; 
      padding:0.5rem 0; border-bottom:1px solid #2a2a3a;
      margin-bottom:0.5rem;">
-  ▸ NMMU Telemetry
+  ▸ HADES Telemetry
 </div>
 """, unsafe_allow_html=True)
         st.divider()
@@ -996,14 +996,12 @@ h1 {
   <span style="font-family:'IBM Plex Mono',monospace; 
                font-size:1.4rem; font-weight:600; 
                color:#e8e8f0; letter-spacing:-0.02em;">
-    PrimaLLM
+    HADES
   </span>
   <span style="font-family:'IBM Plex Mono',monospace; 
                font-size:0.65rem; color:#555570; 
                text-transform:uppercase; letter-spacing:0.1em;">
-    Neural Memory Management Unit &nbsp;·&nbsp; 
-    L1 Set Cache &nbsp;·&nbsp; L2 Source Graph &nbsp;·&nbsp; 
-    L3 Verified Wiki
+    Hierarchical Adaptive Document Encoding System · Charon Compression · Cerberus Verification · L1/L2/L3 Memory
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -1039,11 +1037,11 @@ h1 {
                         status.write("Updating conversation history in L1 cache")
                         status.write("Generating context and calling policy model")
                         final_answer = _chat_loop(prompt)
-                        status.write("Running Sentinel verification and L3 write-back")
+                        status.write("Running Cerberus verification and L3 write-back")
                         is_clean = _run_sentinel_writeback(final_answer)
                         if not is_clean:
                             final_answer = (
-                                "🚨 NLI SENTINEL BLOCK: My policy engine attempted to answer this, "
+                                "🚨 CERBERUS GATE BLOCK: My policy engine attempted to answer this, "
                                 "but the local DeBERTa-v3 verification failed. The source document "
                                 "does not support this claim."
                             )

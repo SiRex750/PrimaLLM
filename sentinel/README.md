@@ -1,8 +1,8 @@
-# Sentinel — NLI Write-Back Verification Gate
+# Cerberus — NLI Write-Back Verification Gate
 
-Prevents hallucinated facts from entering persistent memory using local Natural Language Inference verification.
+The Cerberus gate guards the HADES memory hierarchy — only NLI-verified facts pass into permanent L3 storage.
 
-## What Sentinel Does
+## What Cerberus Does
 
 - Extracts claim triples from LLM-generated text using GLiNER-relex.
 - Builds a source-of-truth SourceGraph from ingested document triples (spaCy).
@@ -28,7 +28,7 @@ Step 5 — GLiNER-extracted triples require 0.85+ entailment confidence (higher 
 - SHA-256 checksum over sorted triple text = deterministic document fingerprint.
 - Any LLM output that contradicts the checksum-verified source is flagged.
 - Analogous to CRC error detection: inject known redundancy (source graph), verify at output (NLI gate).
-- This is the "dirty bit" concept from computer architecture applied to LLM memory.
+- This is the "dirty bit" concept from computer architecture applied to HADES memory.
 
 ## Benchmark Results
 
@@ -99,7 +99,7 @@ Results saved to: `benchmarks/sentinel_benchmark_results.json`
 - **Numeric claims requiring multi-sentence context aggregation**: Connecting a year in sentence 1 to a statistic in sentence 2 scores as neutral.
 - **Future work**: Integration of a larger NLI model (DeBERTa-large) or domain-specific fine-tuning to improve recall without sacrificing precision.
 
-## Using Sentinel as a library
+## Using Cerberus as a library
 
 ```python
 from shared.extractor import extract_claim_triples, extract_source_triples

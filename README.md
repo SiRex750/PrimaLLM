@@ -1,31 +1,33 @@
-# PrimaLLM
+# HADES
+
+**Hierarchical Adaptive Document Encoding System**
 
 A Local-First Neural Memory Management Unit for Verifiable Knowledge Compression and Factual Grounding.
 
 This research project was developed by a 2nd-year CSE (AI/ML) student at PES University to explore the intersection of graph-based knowledge compression and NLI-driven factual verification.
 
-## What is PrimaLLM?
+## What is HADES?
 
-PrimaLLM is a research-oriented Neural Memory Management Unit (NMMU) designed to address context window saturation and hallucination in Large Language Models. It implements a dual-path architecture: **Caveman** for graph-based factual compression and **Sentinel** for NLI-based claim verification. The system provides an end-to-end local pipeline for managing long-term semantic memory, ensuring that only verified information is persisted to long-term storage while maintaining high semantic density in the active context.
+HADES (Hierarchical Adaptive Document Encoding System) is a research-oriented Neural Memory Management Unit (NMMU) designed to address context window saturation and hallucination in Large Language Models. It implements a dual-path architecture: **Charon** for graph-based factual compression and **Cerberus** for NLI-based claim verification. The system provides an end-to-end local pipeline for managing long-term semantic memory, ensuring that only verified information is persisted to long-term storage while maintaining high semantic density in the active context.
 
 ## Architecture Overview
 
-PrimaLLM operates on a three-tier memory hierarchy inspired by operating system cache architectures:
+HADES operates on a three-tier memory hierarchy inspired by operating system cache architectures:
 
 - **L1 (Cache)**: A set-associative context window with **Dynamic Query-Aware Reranking**. This tier uses semantic similarity to "promote" relevant triples into the active context, ensuring query-critical facts (like niche details in large PDFs) are not evicted.
 - **L2 (RAM)**: A semantic vector space for mid-term retrieval. If the L1 re-ranker detects a "Page Fault" (low relevance in current facts), it fetches high-similarity triples from the `all-MiniLM-L6-v2` vector store.
-- **L3 (Disk)**: A verified persistent wiki storage (SQLite) containing only facts that have passed the Sentinel NLI verification gate.
+- **L3 (Disk)**: A verified persistent wiki storage (SQLite) containing only facts that have passed the Cerberus NLI verification gate.
 
 ## Benchmark Results
 
-### CAVEMAN (8-case QA benchmark)
+### CHARON (8-case QA benchmark)
 
 | Metric | Budget=30 (Max Compression) | Budget=150 (Balanced) |
 |:---|:---|:---|
 | Overall accuracy | 75.0% | 75.0% |
 | Average token reduction | 42.1% | 38.9% |
 | Average baseline SDpT | 14.58 tokens/ACU | 14.58 tokens/ACU |
-| Average Caveman SDpT | 8.90 tokens/ACU | 8.96 tokens/ACU |
+| Average Charon SDpT | 8.90 tokens/ACU | 8.96 tokens/ACU |
 | Average SDpT improvement | 5.69 tokens/ACU | 5.63 tokens/ACU |
 | Model | qwen2.5:1.5b (local) | qwen2.5:1.5b (local) |
 
@@ -46,9 +48,9 @@ The Apple Wiki benchmark tests the system's ability to preserve "long-tail" fact
 
 **Key Finding**: Pure PageRank-based compression often evicts niche facts that are crucial for specific user queries. The upgrade to **Dynamic L1 Reranking** (blending PageRank with Semantic Similarity) solved this "PageRank Blindness," allowing the system to promote facts with low global importance but high query relevance.
 
-### SENTINEL (30-case NLI benchmark)
+### CERBERUS (30-case NLI benchmark)
 
-The Sentinel benchmark evaluates the NLI-based verification gate using 30 diverse test cases across four domains from the Apple Wikipedia article.
+The Cerberus benchmark evaluates the NLI-based verification gate using 30 diverse test cases across four domains from the Apple Wikipedia article.
 
 | Metric | Value |
 | :--- | :--- |
@@ -65,17 +67,17 @@ The Sentinel benchmark evaluates the NLI-based verification gate using 30 divers
 - **Hard**: 80.0% (4/5)
 - **Edge**: 25.0% (1/4)
 
-**Key Finding**: Sentinel demonstrates robust performance on easy and medium factual claims. The high "Hard" case accuracy (80%) shows strong resistance to subtle adversarial distortions. However, performance on "Edge" cases (multi-hop entity resolution and complex numbers) remains an area for future optimization with larger local NLI encoders.
+**Key Finding**: Cerberus demonstrates robust performance on easy and medium factual claims. The high "Hard" case accuracy (80%) shows strong resistance to subtle adversarial distortions. However, performance on "Edge" cases (multi-hop entity resolution and complex numbers) remains an area for future optimization with larger local NLI encoders.
 
 
 ## Repository Structure
 
 - `shared/` — Core `KnowledgeTriple` dataclass, dual extractor (spaCy + GLiNER-relex), and L3 SQLite memory interfaces.
-- `caveman/` — Factual graph compression pipeline including `graph.py`, `cache.py`, `compressor.py`, and the compression benchmark suite.
-- `sentinel/` — NLI-based verification pipeline featuring `source_graph.py`, `verifier.py`, `wiki_storage.py`, and the Sentinel benchmark suite.
+- `caveman/` — Factual graph compression pipeline including `graph.py`, `cache.py`, `compressor.py`, and the compression benchmark suite. (Charon)
+- `sentinel/` — NLI-based verification pipeline featuring `source_graph.py`, `verifier.py`, `wiki_storage.py`, and the Cerberus benchmark suite.
 - `benchmarks/` — Directory containing saved JSON results and logs for both system components.
 - `app.py` — Streamlit-based web interface featuring live PyVis knowledge graph visualisations.
-- `primallm.py` — Command-line entrypoint for the complete end-to-end NMMU pipeline.
+- `hades.py` — Command-line entrypoint for the complete end-to-end NMMU pipeline (also accessible as primallm.py for backward compatibility).
 
 ## Installation
 
@@ -115,10 +117,10 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 
 1. **Extraction**: LiteParse or PyPDF2 extracts clean text from uploaded PDF documents.
 2. **Graph Construction**: A spaCy-based SVO (Subject-Verb-Object) extractor builds a source `KnowledgeTriple` set, which is converted into a NetworkX graph for PageRank-based importance scoring.
-3. **Compression**: The Caveman pipeline selects the top-ranked triples and enforces an L1 token budget using a set-associative cache (SYSTEM/FACTS/HISTORY/TOOLS/SCRATCH). It then generates compressed prose via a local Ollama Small Language Model (SLM).
+3. **Compression**: The Charon pipeline selects the top-ranked triples and enforces an L1 token budget using a set-associative cache (SYSTEM/FACTS/HISTORY/TOOLS/SCRATCH). It then generates compressed prose via a local Ollama Small Language Model (SLM).
 4. **Inference**: A local LLM (e.g., Phi-3 or Qwen-2.5 via Ollama) answers the user query using the compressed context.
 5. **Claim Extraction**: The LLM output is added to the SCRATCH set (marked as "dirty"). GLiNER-relex extracts claim triples directly from this generated output.
-6. **Verification**: The Sentinel NLI gate verifies each dirty triple against the original source graph. CLEAN triples are promoted to L3 SQLite storage, while DIRTY triples (hallucinations) are discarded.
+6. **Verification**: The Cerberus NLI gate verifies each dirty triple against the original source graph. CLEAN triples are promoted to L3 SQLite storage, while DIRTY triples (hallucinations) are discarded.
 
 ## Design Principles
 
@@ -131,7 +133,7 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 
 - **spaCy (en_core_web_sm)**: Source triple extraction and NLP preprocessing.
 - **GLiNER-relex (knowledgator/gliner-relex-large-v0.5)**: High-precision claim triple extraction from LLM responses.
-- **DeBERTa (cross-encoder/nli-deberta-v3-small)**: Local NLI verification for the Sentinel gate.
+- **DeBERTa (cross-encoder/nli-deberta-v3-small)**: Local NLI verification for the Cerberus gate.
 - **NetworkX**: Knowledge graph representation and PageRank algorithmic scoring.
 - **tiktoken**: Precise token budget enforcement for context management.
 - **SQLite (WAL mode)**: High-performance storage for L3 verified fact persistence.
@@ -142,7 +144,7 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 
 ## Citation / Academic Context
 
-If you use PrimaLLM in academic work, please cite the following works that inspired this architecture:
+If you use HADES in academic work, please cite the following works that inspired this architecture:
 
 - Lewis et al. (2020) Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
 - Packer et al. (2023) MemGPT: Towards LLMs as Operating Systems
