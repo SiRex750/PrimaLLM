@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-26T23:37:24.902588",
+  "timestamp": "2026-04-27T02:28:36.474359",
   "pdf": "Apple-1.pdf",
   "accuracy": 0.7,
   "avg_reduction": 86.34219021604171,
@@ -31,7 +31,7 @@
     {
       "question": "Where does the apple tree originally come from?",
       "expected": "Kazakhstan",
-      "answer": "The first apple of the world was born in Kazakhstan. Wild Malus sieversii apple, which is native to Central Asia, including Kazakhstan, was the earliest tree cultivated by humans. This suggests that the apple tree originated in this region and spread from there.",
+      "answer": "The wild Malus sieversii apple in Kazakhstan is considered to be the earliest cultivated apple, suggesting its origins trace back thousands of years. Therefore, it can be inferred that apples originate from this region or at least have a significant historical presence there. So, according to the provided facts:\n\nThe original location for apple trees traces back to Kazakhstan where wild Malus sieversii was cultivated earliest in history. \n\nAnswer: Kazakhstan",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -43,7 +43,7 @@
     {
       "question": "What is the scientific name of the wild ancestor of apple trees?",
       "expected": "Malus sieversii",
-      "answer": "The scientific name of the wild ancestor of apple trees is Malus sieversii.",
+      "answer": "Wild Malus sieversii in Kazakhstan. This information can be found within these specific facts provided above, where it states \"wild Malus sieversii apple in Kazakhstan was the earliest tree to be cultivated (in thousands of years).\" The scientific name is derived from this factual statement about its wild ancestor's origin and significance for domestication.",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -55,7 +55,7 @@
     {
       "question": "What percentage of global apple production does China account for in 2013?",
       "expected": "49%",
-      "answer": "China accounted for approximately 54.9% (or about 54,900,000 metric tons) of the total world production of apples in 2013.",
+      "answer": "To find the percentage, we first need to calculate how much of the world's total production was produced by China. Using the provided facts:\n\nChina's Production = 44,066,000 metric tons\nWorld Total Production in 2013 = 80,522,000 metric tons\n\nNow calculate the percentage using this formula: (Part/Whole)*100%\n(China's production / World total production) * 100%\n= (44,066,000 / 80,522,000) * 100% = approximately 54.79%\n\nSo China accounted for roughly 54.79% of global apple production in 2013 according to the provided facts.",
       "is_correct": false,
       "domain": "production",
       "raw_tokens": 4027,
@@ -67,7 +67,7 @@
     {
       "question": "How many known variants of apples are there?",
       "expected": "10000",
-      "answer": "There are over 2,100 apple varieties in total at the National Fruit Collection in England.",
+      "answer": "Over 2,100 apple variants are housed at the National Fruit Collection in England. This information is relevant as it directly answers your question about the number of known apple variants without needing to refer back to other facts provided earlier or additional context from memory. The mention that apples can be made into drinks and their classification under group Maloideae doesn't influence this specific answer regarding the count of different varieties.\nCACHE_MISS",
       "is_correct": false,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -79,7 +79,7 @@
     {
       "question": "What chemical in apple seeds can release cyanide?",
       "expected": "amygdalin",
-      "answer": "The chemical amygdalin found in apple seeds can release cyanide when digested.",
+      "answer": "Amygdalin is the chemical found in apple seeds that can release cyanide when digested. The answer is directly taken from the provided facts, specifically where it states \"Apples contain amygdalin , which can release cyanide when digested.\"",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
@@ -91,7 +91,7 @@
     {
       "question": "When was the first apple orchard in North America established?",
       "expected": "1625",
-      "answer": "The first apple orchard in North America was established when Europeans arrived. This occurred from when Europeans arrived apples as food, which is around 1492 according to historical records.",
+      "answer": "In the early 1920s, when Washington State began producing over half of the nation's domestically grown apples. However, this specific fact does not mention exact dates for the establishment of the first apple orchard in North America. Therefore, based on the provided facts: CACHE_MISS",
       "is_correct": false,
       "domain": "history",
       "raw_tokens": 4027,
@@ -103,7 +103,7 @@
     {
       "question": "Who wrote the Prose Edda that mentions the goddess Idunn?",
       "expected": "Snorri Sturluson",
-      "answer": "Snorri Sturluson wrote the Prose Edda, which includes the mention of the goddess I\u00f0unn giving apples to the gods.",
+      "answer": "Snorri Sturluson wrote the Prose Edda where it is mentioned that the goddess I\u00f0unn gives apples to the gods. This work was composed in the 13th century.",
       "is_correct": true,
       "domain": "culture",
       "raw_tokens": 4027,
@@ -127,7 +127,7 @@
     {
       "question": "What was the total worldwide apple production in 2013?",
       "expected": "90.8 million tonnes",
-      "answer": "The total worldwide apple production in 2013 was 90.8 million tonnes.",
+      "answer": "90.8 million tonnes",
       "is_correct": true,
       "domain": "production",
       "raw_tokens": 4027,
@@ -139,7 +139,7 @@
     {
       "question": "In which plant family are apples classified?",
       "expected": "Rosaceae",
-      "answer": "Apples are classified in the subfamily Maloideae within the family Rosaceae.",
+      "answer": "Apple belongs to the Rosaceae family. Specifically, they fall under the subfamily Maloideae. This information is derived from the provided facts stating \"apples belong in the group Maloideae\" and that it's a part of the larger plant family known as Rosaceae.",
       "is_correct": true,
       "domain": "botany",
       "raw_tokens": 4027,
