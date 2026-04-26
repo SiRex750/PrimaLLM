@@ -7,7 +7,6 @@ import tempfile
 
 import networkx as nx
 import ollama
-import PyPDF2
 import streamlit as st
 import streamlit.components.v1 as components
 from pyvis.network import Network
@@ -115,6 +114,9 @@ def _init_session_state() -> None:
 
     if "triple_source_pages" not in st.session_state:
         st.session_state.triple_source_pages = {}
+
+    if "deep_entity_resolution" not in st.session_state:
+        st.session_state.deep_entity_resolution = False
 
     cache: L1Cache = st.session_state.l1_cache
     if cache.budgets.get("system", 0) < desired_system_budget:
@@ -344,25 +346,89 @@ def query_l3_wiki(keyword: str) -> str:
 
 
 def process_pdf(file) -> tuple[int, int]:
-    reader = PyPDF2.PdfReader(file)
+    import pymupdf4llm
+    import re as _re
+
+    # Extract layout-aware markdown from entire PDF at once
+    # pymupdf4llm handles headers, footnotes, columns automatically
+    # without any font size assumptions
+    try:
+        md_text = pymupdf4llm.to_markdown(
+            file,
+            page_chunks=True,  # returns list of dicts, one per page
+        )
+    except Exception:
+        # Fallback: open from bytes if file object doesn't work directly
+        import tempfile, os
+        file.seek(0)
+        with tempfile.NamedTemporaryFile(
+            suffix=".pdf", delete=False
+        ) as tmp:
+            tmp.write(file.read())
+            tmp_path = tmp.name
+        md_text = pymupdf4llm.to_markdown(
+            tmp_path, page_chunks=True
+        )
+        os.unlink(tmp_path)
+
     triples: list[KnowledgeTriple] = []
     source_page_lookup: dict[tuple[str, str, str], int] = {}
     all_sentences: list[str] = []
 
-    for page_number, page in enumerate(reader.pages, start=1):
-        page_text = (page.extract_text() or "").strip()
-        if not page_text:
+    STOP_MARKERS = (
+        "## references", "## further reading", "## see also",
+        "## external links", "## bibliography", "## other websites",
+        "# references", "# further reading",
+    )
+
+    for page_number, page_chunk in enumerate(md_text, start=1):
+        # page_chunk is a dict with 'text' key
+        page_text = page_chunk.get("text", "")
+
+        # Stop at reference sections
+        page_lower = page_text.lower()
+        if any(marker in page_lower for marker in STOP_MARKERS):
+            # Truncate at the stop marker
+            for marker in STOP_MARKERS:
+                idx = page_lower.find(marker)
+                if idx != -1:
+                    page_text = page_text[:idx]
+                    break
+
+        # Clean markdown artifacts
+        # Remove picture placeholders
+        page_text = _re.sub(r'==> picture \[.*?\] intentionally omitted <==', '', page_text)
+        # Remove headers (## Apple, ### Botanical information)
+        page_text = _re.sub(r'^#{1,6}\s+.*$', '', page_text,
+                             flags=_re.MULTILINE)
+        # Remove bold/italic markers
+        page_text = _re.sub(r'\*\*|__|\*|_', '', page_text)
+        # Remove citation markers
+        page_text = _re.sub(r'\[\s*\d+\s*\]', '', page_text)
+        # Remove image references
+        page_text = _re.sub(r'!\[.*?\]\(.*?\)', '', page_text)
+        # Normalise whitespace
+        page_text = _re.sub(r'\s+', ' ', page_text).strip()
+
+        if not page_text or len(page_text) < 30:
             continue
 
+        # Extract sentences for Cerberus source_sentences
+        page_sentences = [
+            s.strip() for s in
+            _re.split(r'(?<=[.!?])\s+', page_text)
+            if len(s.strip()) > 20
+        ]
+        all_sentences.extend(page_sentences)
+
+        # Extract triples from clean body text
         page_triples = extract_source_triples(page_text)
         triples.extend(page_triples)
 
-        import re
-        page_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', page_text) if len(s.strip()) > 20]
-        all_sentences.extend(page_sentences)
-
         for triple in page_triples:
-            source_page_lookup.setdefault(_triple_key(triple), page_number)
+            source_page_lookup.setdefault(
+                _triple_key(triple), page_number
+            )
 
     if not triples:
         st.session_state.source_graph = None
@@ -385,10 +451,27 @@ def process_pdf(file) -> tuple[int, int]:
     injected_from_l3 = _inject_clean_facts_into_l1(cache)
 
     st.session_state.telemetry["l1_status"] = "pdf_loaded"
+
+    # Optional deep entity resolution pass
+    if st.session_state.get("deep_entity_resolution", False):
+        from caveman.core.graph import normalise_entities_with_llm
+        with st.spinner("Deep entity resolution running..."):
+            source_graph.graph, extra_merges = normalise_entities_with_llm(
+                source_graph.graph,
+                ollama_model=OLLAMA_MODEL,
+            )
+        if extra_merges > 0:
+            _push_telemetry_item(
+                "memory_faults",
+                f"Deep resolution: {extra_merges} additional aliases resolved"
+            )
+
+    nodes_after = source_graph.graph.number_of_nodes()
     _push_telemetry_item(
         "memory_faults",
         (
-            f"PDF ingested: {len(triples)} triples -> {len(cache.set_facts)} active fact entries "
+            f"PDF ingested: {len(triples)} raw triples → "
+            f"{nodes_after} merged graph nodes "
             f"(L3 injected: {injected_from_l3})"
         ),
     )
@@ -442,6 +525,30 @@ def _render_sidebar() -> None:
             st.caption(f"> {fault}")
 
         st.divider()
+        st.markdown(
+            "<div class='telemetry-label'>Graph Options</div>",
+            unsafe_allow_html=True,
+        )
+        deep_res = st.toggle(
+            "Deep entity resolution",
+            value=st.session_state.deep_entity_resolution,
+            help=(
+                "Runs a local LLM pass to resolve pronouns and "
+                "implicit references (e.g. 'it' → 'apple tree'). "
+                "Adds 5-8 seconds to PDF ingestion. "
+                "Disable for fast demos."
+            ),
+        )
+        st.session_state.deep_entity_resolution = deep_res
+        if deep_res:
+            st.markdown(
+                "<div style='font-family:IBM Plex Mono,monospace;"
+                "font-size:0.6rem;color:#ffab40;padding:2px 0'>"
+                "⚠ Deep mode: ingestion ~8s slower</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.divider()
         if st.button("Flush L1 Cache"):
             st.session_state.l1_cache.set_facts.clear()
             st.session_state.l1_cache.set_history.clear()
@@ -483,6 +590,8 @@ def _render_sidebar() -> None:
 
         st.markdown("**Tools**")
         st.write([f"{item.tool_name}: {item.text}" for item in cache.set_tools] or ["<empty>"])
+
+
 
 
 def _run_sentinel_writeback(final_answer: str) -> bool:

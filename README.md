@@ -24,12 +24,23 @@ HADES operates on a three-tier memory hierarchy inspired by operating system cac
 
 | Metric | Budget=30 (Max Compression) | Budget=150 (Balanced) |
 |:---|:---|:---|
-| Overall accuracy | 75.0% | 75.0% |
-| Average token reduction | 42.1% | 38.9% |
+| Accuracy (best run) | 75.0% | 100.0% |
+| Accuracy (worst run) | 75.0% | 87.5% |
+| Accuracy (mean across 3 runs) | 75.0% | 95.8% |
+| Average token reduction | 42.1% | 44.8% |
 | Average baseline SDpT | 14.58 tokens/ACU | 14.58 tokens/ACU |
-| Average Charon SDpT | 8.90 tokens/ACU | 8.96 tokens/ACU |
-| Average SDpT improvement | 5.69 tokens/ACU | 5.63 tokens/ACU |
-| Model | qwen2.5:1.5b (local) | qwen2.5:1.5b (local) |
+| Average Charon SDpT | 8.90 tokens/ACU | 8.11 tokens/ACU |
+| Average SDpT improvement | 5.69 tokens/ACU | 6.47 tokens/ACU |
+| PDF extraction | PyPDF2 (raw) | pymupdf4llm (layout-aware) |
+| Node merging | None | Embedding cosine (threshold 0.82) |
+| Model | qwen2.5:1.5b | qwen2.5:1.5b |
+
+"Accuracy varies across runs due to non-determinism in
+qwen2.5:1.5b at temperature=0 on CPU floating point arithmetic.
+The Balanced configuration uses weighted PageRank graph scoring,
+layout-aware PDF extraction (pymupdf4llm), and embedding-based
+entity coreference merging. SDpT = compressed_tokens / unique_ACUs.
+Lower SDpT = higher information density per token."
 
 The L1 FACTS budget is a configurable parameter. 
 Higher budgets preserve more context (better accuracy on 

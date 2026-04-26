@@ -22,22 +22,34 @@ def triple_checksum(triple: KnowledgeTriple) -> str:
 
 
 def build_source_graph(triples: list[KnowledgeTriple], embedder=None, source_sentences: list[str] = None) -> SourceGraph:
-    graph = nx.DiGraph()
+    from caveman.core import build_graph
+    graph = build_graph(triples)
     checksums: dict[str, str] = {}
 
     for triple in triples:
-        checksum = triple_checksum(triple)
-        
-        if not graph.has_node(triple.subject):
-            v_subj = embedder.encode(triple.subject) if embedder else None
-            graph.add_node(triple.subject, checksum=checksum, vector=v_subj)
-            
-        if not graph.has_node(triple.object):
-            v_obj = embedder.encode(triple.object) if embedder else None
-            graph.add_node(triple.object, checksum=checksum, vector=v_obj)
-            
-        graph.add_edge(triple.subject, triple.object, verb=triple.verb, checksum=checksum)
-        checksums[triple.as_text()] = checksum
+        checksums[triple.as_text()] = triple_checksum(triple)
+
+    # ── Entity coreference merging ──────────────────────────────
+    # Collapse alias nodes into canonical entities before PageRank.
+    # "Malus sieversii" and "wild ancestor" accumulate shared 
+    # PageRank rather than splitting it across two nodes.
+    # Uses batched embedding — ~80ms overhead for 100 nodes.
+    if embedder is not None:
+        from caveman.core.graph import merge_similar_nodes
+        graph, merged_count = merge_similar_nodes(
+            graph, embedder, threshold=0.82
+        )
+        if merged_count > 0:
+            import logging
+            logging.info(
+                f"[HADES] Entity merging: resolved {merged_count} "
+                f"alias nodes → {graph.number_of_nodes()} canonical nodes"
+            )
+
+    # Embed nodes (required for L2 memory queries)
+    for node in graph.nodes():
+        if embedder:
+            graph.nodes[node]["vector"] = embedder.encode(node)
 
     master_text = "".join(sorted(triple.as_text() for triple in triples))
     master_checksum = sha256(master_text.encode("utf-8")).hexdigest()

@@ -5,7 +5,8 @@ tiktoken>=0.5.0
 networkx>=3.0
 pyvis>=0.3.0
 streamlit>=1.30.0
-PyPDF2>=3.0.0
+pymupdf
+pymupdf4llm
 ollama>=0.1.0
 transformers>=4.35.0
 torch>=2.0.0

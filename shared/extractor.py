@@ -60,6 +60,17 @@ def extract_source_triples(text: str) -> list[KnowledgeTriple]:
         obj = _find_object(sent, verb_token)
 
         if subject and verb and obj:
+            # Move leading preposition from object to verb for cleaner nodes
+            # e.g., (apple, born, in Kazakhstan) -> (apple, born in, Kazakhstan)
+            PREPOSITIONS = {
+                "in", "on", "at", "from", "to", "by", "with", "for", "into", "of"
+            }
+            obj_parts = obj.split()
+            if len(obj_parts) > 1 and obj_parts[0].lower() in PREPOSITIONS:
+                prep = obj_parts[0]
+                verb = f"{verb} {prep}"
+                obj = " ".join(obj_parts[1:])
+
             triples.append(KnowledgeTriple(
                 subject=subject,
                 verb=verb,
