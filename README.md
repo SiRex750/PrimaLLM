@@ -32,7 +32,7 @@ HADES operates on a three-tier memory hierarchy inspired by operating system cac
 | Average Charon SDpT | 8.90 tokens/ACU | 8.11 tokens/ACU |
 | Average SDpT improvement | 5.69 tokens/ACU | 6.47 tokens/ACU |
 | PDF extraction | PyPDF2 (raw) | pymupdf4llm (layout-aware) |
-| Node merging | None | Embedding cosine (threshold 0.82) |
+| Node merging | None | Embedding cosine (threshold 0.75) |
 | Model | qwen2.5:1.5b | qwen2.5:1.5b |
 
 "Accuracy varies across runs due to non-determinism in
