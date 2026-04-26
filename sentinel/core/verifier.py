@@ -18,7 +18,7 @@ class VerificationResult:
 
 
 
-def verify_claim(claim: KnowledgeTriple, source_graph: SourceGraph, model_name: str = "sileod/deberta-v3-base-tasksource-nli", source_sentences: list[str] = None) -> VerificationResult:
+def verify_claim(claim: KnowledgeTriple, source_graph: SourceGraph, model_name: str = "cross-encoder/nli-deberta-v3-base", source_sentences: list[str] = None) -> VerificationResult:
     import torch
     import torch.nn.functional as F
 

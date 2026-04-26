@@ -174,8 +174,8 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     
     messages = [
         {"role": "system", "content": 
-         "You MUST output ONLY valid JSON matching schema: "
-         "{\"citation\": \"...\", \"answer\": \"...\"} or "
+         "You are a factual QA system. Output ONLY plain text for answers. "
+         "If the answer is not in the facts, output exactly: "
          "{\"tool\": \"search_memory\", \"keyword\": \"...\"}"},
         {"role": "user", "content": 
          f"Facts:\n{facts_block}\n\nQuestion: {question}"}
@@ -188,17 +188,12 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
     )
     content = response['message']['content'].strip()
     
-    keyword = None
-    try:
-        parsed_initial = json.loads(content)
-        if parsed_initial.get("tool") == "search_memory":
-            keyword = str(parsed_initial.get("keyword", "")).strip()
-    except json.JSONDecodeError:
-        # JSON FAULT: Trigger L2
-        keyword = question.replace('?', '').split()[-3:]
-        keyword = ' '.join(keyword)
-    
-    if keyword:
+    # Check for tool call
+    match = re.search(r'"keyword":\s*"([^"]+)"', content)
+    if match:
+        keyword = match.group(1)
+        
+        # Query L2 graph
         from app import query_l2_memory
         l2_result = query_l2_memory(keyword, source_graph)
         
@@ -206,21 +201,18 @@ def ask_with_l2_fallback(question, cache, source_graph, embedder, raw_tokens):
             messages.append({"role": "assistant", "content": content})
             messages.append({"role": "user", "content": 
                 f"Additional context from memory: {l2_result}\n"
-                f"Now answer in JSON format with citation: {question}"})
+                f"Now answer in plain text: {question}"})
             response2 = ollama.chat(
                 model=OLLAMA_MODEL,
                 messages=messages,
                 options={"temperature": 0.0, "num_predict": 200}
             )
-            content = response2['message']['content'].strip()
-    
-    try:
-        parsed = json.loads(content)
-        answer = parsed.get("answer", content)
-    except:
-        # Fallback for mangled JSON
-        match = re.search(r'"answer":\s*"([^"]+)"', content)
-        answer = match.group(1) if match else content
+            answer = response2['message']['content'].strip()
+        else:
+            answer = "INSUFFICIENT DATA"
+    else:
+        # Plain text answer
+        answer = content
 
     caveman_tokens = count_tokens(facts_block)
     return answer, caveman_tokens

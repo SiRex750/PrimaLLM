@@ -160,7 +160,7 @@ $env:PYTHONPATH="."; .\.venv\Scripts\python.exe sentinel_apple_benchmark.py
 
 - **spaCy (en_core_web_sm)**: Source triple extraction and NLP preprocessing.
 - **GLiNER-relex (knowledgator/gliner-relex-large-v0.5)**: High-precision claim triple extraction from LLM responses.
-- **DeBERTa (sileod/deberta-v3-base-tasksource-nli)**: Local NLI verification for the Cerberus gate.
+- **DeBERTa (cross-encoder/nli-deberta-v3-base)**: Local NLI verification for the Cerberus gate.
 - **NetworkX**: Knowledge graph representation and PageRank algorithmic scoring.
 - **tiktoken**: Precise token budget enforcement for context management.
 - **SQLite (WAL mode)**: High-performance storage for L3 verified fact persistence.

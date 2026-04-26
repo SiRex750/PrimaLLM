@@ -37,28 +37,23 @@ st.set_page_config(
 SYSTEM_INSTRUCTION = """You are the HADES NMMU (Neural Memory Management Unit), a strict hardware instruction decoder. 
 You do not converse. You do not explain your thoughts. 
 
-You MUST output ONLY a valid JSON object matching the schemas below.
+You have two operating modes. You MUST output ONLY the mode's payload.
 
 1. CACHE HIT (Answer Synthesis):
-   If the L1 Cache (Context) contains the answer, you must cite the exact triple you used.
-   Output schema:
-   {
-       "citation": "[Subject] [Verb] [Object]",
-       "answer": "Your concise answer based on that triple."
-   }
-
+   If the L1 Cache (Context) contains the answer, output the final answer directly in plain text.
+   
 2. CACHE MISS (Memory Fault):
-   If the answer is NOT in the L1 Cache, you MUST output exactly:
+   If the answer is NOT in the L1 Cache, you MUST trigger an L2 Page Fault by outputting STRICTLY a JSON object matching this schema:
    {
        "tool": "search_memory",
        "keyword": "exact_semantic_keyword_to_search"
    }
 
 Constraints:
-- You MUST cite a triple from the 'Facts' section for every CACHE HIT.
-- If you cannot find a valid triple to cite, you MUST output the CACHE MISS JSON.
-- DO NOT output any text before or after the JSON. 
-- Failure to output valid JSON triggers an automatic Memory Fault."""
+- You MUST answer based ONLY on the provided Facts.
+- For CACHE HIT, output ONLY the plain text answer.
+- For CACHE MISS, output ONLY the JSON object.
+- DO NOT output any text before or after the JSON."""
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 OLLAMA_OPTIONS = {
@@ -694,30 +689,6 @@ def _chat_loop(prompt: str) -> str:
     content = _call_policy_model(conversation)
     keyword = _extract_search_keyword(content)
 
-    if keyword is None:
-        tool_calls_so_far = int(st.session_state.telemetry.get("tool_calls", 0))
-        if tool_calls_so_far == 0 and _is_single_word_reply(content):
-            _push_telemetry_item(
-                "memory_faults",
-                "FORCE SEARCH | single-word non-JSON output while tool_calls=0",
-            )
-            conversation.append({"role": "assistant", "content": content})
-            conversation.append({"role": "user", "content": FORCE_SEARCH_PROMPT})
-            content = _call_policy_model(conversation)
-            keyword = _extract_search_keyword(content)
-
-    keyword = None
-    try:
-        parsed_initial = json.loads(content)
-        if parsed_initial.get("tool") == "search_memory":
-            keyword = str(parsed_initial.get("keyword", "")).strip()
-    except json.JSONDecodeError:
-        # FORCE FAULT: If model failed to output JSON, assume context wasn't clear enough
-        # Extract a keyword from the prompt instead
-        keyword = prompt.replace("?", "").split()[-3:]
-        keyword = " ".join(keyword)
-        _push_telemetry_item("memory_faults", f"JSON FAULT | Triggering L2 for keyword: {keyword}")
-
     if keyword:
         st.session_state.telemetry["tool_calls"] = st.session_state.telemetry.get("tool_calls", 0) + 1
 
@@ -743,30 +714,16 @@ def _chat_loop(prompt: str) -> str:
             "content": (
                 f"TOOL RESULT: {tool_output}\n\n"
                 "COMMAND: Search complete. You MUST synthesize the final answer now "
-                "using the tool result above. Output schema:\n"
-                "{\"citation\": \"Triple from context\", \"answer\": \"...\"}\n"
-                "If the result is empty, reply with 'INSUFFICIENT DATA'."
+                "using ONLY the tool result above. DO NOT output JSON. DO NOT call "
+                "search_memory again. If the result is empty, reply with "
+                "'INSUFFICIENT DATA'."
             ),
         })
 
-        final_raw = _call_policy_model(conversation)
-        try:
-            parsed = json.loads(final_raw)
-            final_answer = parsed.get("answer", final_raw)
-            citation = parsed.get("citation", "none")
-            _push_telemetry_item("sentinel_log", f"Refined citation: {citation}")
-        except json.JSONDecodeError:
-            final_answer = final_raw
+        final_answer = _call_policy_model(conversation)
     else:
         # CACHE HIT case
-        try:
-            parsed = json.loads(content)
-            final_answer = parsed.get("answer", content)
-            citation = parsed.get("citation", "none")
-            _push_telemetry_item("sentinel_log", f"L1 Citation: {citation}")
-        except json.JSONDecodeError:
-            # Should be unreachable due to the initial JSON_FAULT logic, but for safety:
-            final_answer = content
+        final_answer = content
 
     cache.add_history_turn("assistant", final_answer)
     return final_answer
