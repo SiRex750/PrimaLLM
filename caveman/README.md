@@ -25,25 +25,25 @@ The SCRATCH set implements a "dirty bit" write-back policy inspired by computer 
 | Metric | Value |
 | :--- | :--- |
 | Total Cases | 8 |
-| Overall Accuracy | 75.0% (6/8) |
-| Average token reduction | 42.1% |
-| Average baseline SDpT | 14.58 tokens/ACU (raw text) |
-| Average Charon SDpT | 8.90 tokens/ACU (compressed) |
-| Average improvement | 5.69 tokens/ACU |
+| Overall Accuracy | 87.5% (7/8) |
+| Average token reduction | 6.8% |
+| Average baseline SDpT | 6.85 tokens/ACU (raw text) |
+| Average Charon SDpT | 6.39 tokens/ACU (compressed) |
+| Average improvement | 0.46 tokens/ACU |
 | Model | qwen2.5:1.5b via Ollama |
 
 ### Detailed Performance Breakdown
 
 | Case | Token Delta | Reduction | SDpT (Base → Cave) | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| Case 1 (ATP/mitochondria) | 24 → 13 | 45.8% | 12.0 → 6.5 | PASS |
-| Case 2 (Caesar/Rubicon) | 32 → 17 | 46.9% | 10.7 → 5.7 | PASS |
-| Case 3 (NVIDIA revenue) | 37 → 22 | 40.5% | 12.3 → 11.0 | PASS |
-| Case 4 (CRISPR scissors) | 42 → 19 | 54.8% | 21.0 → 9.5 | FAIL |
-| Case 5 (Apollo 11/Collins) | 40 → 22 | 45.0% | 20.0 → 11.0 | PASS |
-| Case 6 (interest rates) | 44 → 9 | 79.5% | 14.7 → 4.5 | FAIL |
-| Case 7 (Transformers/attention) | 38 → 26 | 31.6% | 12.7 → 8.7 | PASS |
-| Case 8 (photosynthesis/oxygen) | 40 → 43 | -7.5% | 13.3 → 14.3 | PASS |
+| Case 1 (ATP/mitochondria) | 24 → 21 | 12.5% | 6.0 → 5.3 | PASS |
+| Case 2 (Caesar/Rubicon) | 32 → 33 | -3.1% | 5.3 → 5.5 | PASS |
+| Case 3 (NVIDIA revenue) | 37 → 36 | 2.7% | 6.2 → 7.2 | PASS |
+| Case 4 (CRISPR scissors) | 42 → 35 | 16.7% | 7.0 → 5.8 | PASS |
+| Case 5 (Apollo 11/Collins) | 40 → 30 | 25.0% | 10.0 → 7.5 | PASS |
+| Case 6 (interest rates) | 44 → 14 | 68.2% | 7.3 → 2.3 | PASS |
+| Case 7 (Transformers/attention) | 38 → 40 | -5.3% | 6.3 → 6.7 | PASS |
+| Case 8 (photosynthesis/oxygen) | 40 → 65 | -62.5% | 6.7 → 10.8 | FAIL |
 
 ## SDpT Metric
 

@@ -119,12 +119,19 @@ def _is_valid_entity(label: str) -> bool:
     return True
 
 
-def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.DiGraph:
+def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.MultiDiGraph:
+    """
+    Builds a MultiDiGraph from KnowledgeTriples, preserving N-ary properties.
+    """
     from collections import Counter
-    graph = nx.DiGraph()
+    graph = nx.MultiDiGraph()
     triple_list = list(triples)
-    freq: Counter = Counter(t.as_text() for t in triple_list)
-    for triple in triple_list:
+    
+    # Aggregate identical triples (by all N-ary properties)
+    freq: Counter = Counter(triple_list)
+    unique_triples = set(triple_list)
+
+    for triple in unique_triples:
         # Filter out artifact labels before adding to graph
         if not _is_valid_entity(triple.subject):
             continue
@@ -136,20 +143,26 @@ def build_graph(triples: Iterable[KnowledgeTriple]) -> nx.DiGraph:
         if not graph.has_node(triple.object):
             graph.add_node(triple.object)
         
-        weight = freq[triple.as_text()]
-        if graph.has_edge(triple.subject, triple.object):
-            graph[triple.subject][triple.object]["weight"] += weight
-        else:
-            graph.add_edge(
-                triple.subject,
-                triple.object,
-                verb=triple.verb,
-                weight=weight,
-            )
+        weight = freq[triple]
+        graph.add_edge(
+            triple.subject,
+            triple.object,
+            verb=triple.verb,
+            weight=weight,
+            modality=triple.modality,
+            is_negated=triple.is_negated,
+            condition=triple.condition,
+            temporal_anchors=triple.temporal_anchors,
+            extraction_method=triple.extraction_method,
+            is_deterministic=triple.is_deterministic
+        )
     return graph
 
 
-def pagerank_scores(graph: nx.DiGraph) -> dict[str, float]:
+def pagerank_scores(graph: nx.MultiDiGraph) -> dict[str, float]:
+    """
+    Computes PageRank scores. Works with MultiDiGraph by summing weights of parallel edges.
+    """
     if graph.number_of_nodes() == 0:
         return {}
     return nx.pagerank(graph, weight="weight")
@@ -205,34 +218,13 @@ def rank_triples_by_importance(triples: Iterable[KnowledgeTriple]) -> list[tuple
 
 
 def merge_similar_nodes(
-    graph: nx.DiGraph,
+    graph: nx.MultiDiGraph,
     embedder,
     threshold: float = 0.75,
-) -> tuple[nx.DiGraph, int]:
+) -> tuple[nx.MultiDiGraph, int]:
     """
-    Merge graph nodes that refer to the same real-world entity
-    using cosine similarity between node label embeddings.
-
-    Uses batched encoding for efficiency (~80ms for 100 nodes).
-    
-    Examples of what gets merged at threshold=0.82:
-    - "apple tree" + "apple trees" → "apple tree" (shorter wins)
-    - "China" + "china" → "China"
-    - "Malus domestica" + "cultivated apple" → depends on similarity
-    - "they" + "apple flowers" → kept separate (low similarity)
-
-    Merging redirects all edges from alias nodes to the canonical
-    node. Edge weights are accumulated. Self-loops are discarded.
-
-    Args:
-        graph: The directed graph from build_graph()
-        embedder: SentenceTransformer instance (all-MiniLM-L6-v2)
-        threshold: Cosine similarity threshold. 0.82 is conservative.
-                   Lower to 0.72 to catch more aliases.
-                   Raise to 0.90 for near-identical strings only.
-
-    Returns:
-        Tuple of (merged_graph, number_of_nodes_merged)
+    Merge graph nodes that refer to the same real-world entity.
+    Redirects multi-edges while preserving their individual N-ary attributes.
     """
     from sklearn.metrics.pairwise import cosine_similarity as cos_sim
 
@@ -267,8 +259,8 @@ def merge_similar_nodes(
     if not merge_map:
         return graph, 0
 
-    # Build new graph redirecting edges to canonical nodes
-    new_graph = nx.DiGraph()
+    # Build new MultiDiGraph redirecting edges to canonical nodes
+    new_graph = nx.MultiDiGraph()
 
     for node in nodes:
         canonical = merge_map.get(node, node)
@@ -280,38 +272,21 @@ def merge_similar_nodes(
         new_dst = merge_map.get(dst, dst)
         if new_src == new_dst:
             continue  # discard self-loops from merging
-        if new_graph.has_edge(new_src, new_dst):
-            new_graph[new_src][new_dst]["weight"] = (
-                new_graph[new_src][new_dst].get("weight", 1)
-                + data.get("weight", 1)
-            )
-        else:
-            new_graph.add_edge(new_src, new_dst, **data)
+        
+        # In a MultiDiGraph, we simply add the edge with its data.
+        # This preserves distinct N-ary properties.
+        new_graph.add_edge(new_src, new_dst, **data)
 
     return new_graph, len(merge_map)
 
 
 def normalise_entities_with_llm(
-    graph: nx.DiGraph,
+    graph: nx.MultiDiGraph,
     ollama_model: str = "qwen2.5:1.5b",
-) -> tuple[nx.DiGraph, int]:
+) -> tuple[nx.MultiDiGraph, int]:
     """
     Optional second-pass entity normalisation using a local LLM.
-
-    Identifies which short node labels (pronouns, definite articles,
-    abbreviated names) refer to longer canonical entities and merges
-    them. More powerful than embedding similarity for implicit 
-    references like "it" → "apple" or "the goddess" → "Idunn".
-
-    This is SLOW (~5-8 seconds on CPU). Only call when the user
-    explicitly enables "Deep entity resolution" in the UI.
-
-    Args:
-        graph: Graph after merge_similar_nodes() has already run.
-        ollama_model: Local Ollama model to use for normalisation.
-
-    Returns:
-        Tuple of (normalised_graph, number_of_additional_merges)
+    Redirects multi-edges while preserving their individual N-ary attributes.
     """
     import ollama
     import json
@@ -321,7 +296,6 @@ def normalise_entities_with_llm(
         return graph, 0
 
     # Only send short/ambiguous nodes to the LLM
-    # Long specific names (>25 chars) are already canonical
     short_nodes = [n for n in nodes if len(str(n)) <= 25]
     long_nodes = [n for n in nodes if len(str(n)) > 25]
 
@@ -367,7 +341,7 @@ def normalise_entities_with_llm(
     if not merge_map:
         return graph, 0
 
-    new_graph = nx.DiGraph()
+    new_graph = nx.MultiDiGraph()
     for node in nodes:
         canonical = merge_map.get(node, node)
         if canonical not in new_graph:
@@ -378,12 +352,7 @@ def normalise_entities_with_llm(
         new_dst = merge_map.get(dst, dst)
         if new_src == new_dst:
             continue
-        if new_graph.has_edge(new_src, new_dst):
-            new_graph[new_src][new_dst]["weight"] = (
-                new_graph[new_src][new_dst].get("weight", 1)
-                + data.get("weight", 1)
-            )
-        else:
-            new_graph.add_edge(new_src, new_dst, **data)
+            
+        new_graph.add_edge(new_src, new_dst, **data)
 
     return new_graph, len(merge_map)

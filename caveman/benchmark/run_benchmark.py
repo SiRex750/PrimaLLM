@@ -446,10 +446,10 @@ def main() -> int:
         "cases": rows
     }
 
-    with open("caveman_benchmark_results.json", "w") as f:
+    with open("benchmarks/caveman_benchmark_results.json", "w") as f:
         json.dump(results_summary, f, indent=2)
 
-    print("\n[SUCCESS] Results saved to caveman_benchmark_results.json")
+    print("\n[SUCCESS] Results saved to benchmarks/caveman_benchmark_results.json")
     print(f"   Overall accuracy: {results_summary['accuracy']*100:.1f}%")
     print(f"   Avg compression: {results_summary['avg_compression_ratio']:.1f}%")
     print(f"   Avg baseline SDpT: {results_summary['avg_baseline_sdpt']:.2f}")

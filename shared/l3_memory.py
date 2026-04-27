@@ -22,17 +22,21 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     subject TEXT NOT NULL,
     verb TEXT NOT NULL,
     object TEXT NOT NULL,
+    modality TEXT NOT NULL DEFAULT '',
+    is_negated INTEGER NOT NULL DEFAULT 0,
+    condition TEXT NOT NULL DEFAULT '',
+    temporal_anchors TEXT NOT NULL DEFAULT '[]',
     source_page INTEGER,
     sentinel_status TEXT NOT NULL CHECK (sentinel_status IN ('CLEAN', 'DIRTY')),
     timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(subject, verb, object)
+    UNIQUE(subject, verb, object, condition, temporal_anchors)
 );
 """
 
 _INSERT_FACT_SQL = """
 INSERT OR IGNORE INTO knowledge_base
-    (subject, verb, object, source_page, sentinel_status, timestamp)
-VALUES (?, ?, ?, ?, ?, ?);
+    (subject, verb, object, modality, is_negated, condition, temporal_anchors, source_page, sentinel_status, timestamp)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 
@@ -98,6 +102,10 @@ def save_fact(
                     normalized_subject,
                     normalized_verb,
                     normalized_object,
+                    triple.modality,
+                    1 if triple.is_negated else 0,
+                    triple.condition,
+                    json.dumps(triple.temporal_anchors),
                     normalized_source_page,
                     normalized_status,
                     now,
@@ -114,14 +122,24 @@ def fetch_clean_facts(db_path: str | Path | None = None) -> list[dict[str, Any]]
         with _connect(resolved_db_path) as conn:
             rows = conn.execute(
                 """
-                SELECT id, subject, verb, object, source_page, sentinel_status, timestamp
+                SELECT id, subject, verb, object, modality, is_negated, condition, 
+                       temporal_anchors, source_page, sentinel_status, timestamp
                 FROM knowledge_base
                 WHERE sentinel_status = 'CLEAN'
                 ORDER BY id ASC
                 """
             ).fetchall()
 
-    return [dict(row) for row in rows]
+    results = []
+    for row in rows:
+        d = dict(row)
+        try:
+            d["temporal_anchors"] = tuple(json.loads(d.get("temporal_anchors", "[]")))
+        except (json.JSONDecodeError, TypeError):
+            d["temporal_anchors"] = tuple()
+        results.append(d)
+
+    return results
 
 
 def _migrate_legacy_json(db_path: Path, legacy_json_path: Path) -> int:
@@ -154,7 +172,16 @@ def _migrate_legacy_json(db_path: Path, legacy_json_path: Path) -> int:
 
                 source_page = _normalize_source_page(item.get("source_page"))
                 timestamp = str(item.get("timestamp", "")).strip() or now
-                rows_to_insert.append((subject, verb, object_text, source_page, status, timestamp))
+                
+                modality = str(item.get("modality", "")).strip()
+                is_negated = 1 if item.get("is_negated") else 0
+                condition = str(item.get("condition", "")).strip()
+                temporal_anchors = json.dumps(item.get("temporal_anchors", []))
+                
+                rows_to_insert.append((
+                    subject, verb, object_text, modality, is_negated, condition, 
+                    temporal_anchors, source_page, status, timestamp
+                ))
 
     if rows_to_insert:
         with _connect(db_path) as conn:
@@ -201,8 +228,17 @@ def fetch_clean_facts_by_similarity(
     if not facts:
         return []
 
-    # 2. Build fact strings
-    fact_strings = [f"{f['subject']} {f['verb']} {f['object']}" for f in facts]
+    # 2. Build fact strings for similarity
+    fact_strings = []
+    for f in facts:
+        text = f"{f['subject']} {f['verb']} {f['object']}"
+        if f.get("is_negated"):
+            text = f"{f['subject']} not {f['verb']} {f['object']}"
+        if f.get("modality"):
+            text = f"{text} ({f['modality']})"
+        if f.get("condition"):
+            text = f"{text} (Condition: {f['condition']})"
+        fact_strings.append(text)
 
     # 3. Batch encode fact strings
     fact_vectors = embedder.encode(fact_strings)
