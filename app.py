@@ -342,7 +342,7 @@ def query_l2_memory(query: str, keyword: str, source_graph) -> str:
     # Sort and take top 5
     top_nodes = sorted(node_scores, key=lambda x: x[1], reverse=True)[:5]
     
-    if not top_nodes or top_nodes[0][1] < 0.35: # Lower threshold for initial retrieval
+    if not top_nodes or top_nodes[0][1] < 0.60: # Threshold reverted to 0.60
         return ""
 
     candidate_facts = []
@@ -357,13 +357,30 @@ def query_l2_memory(query: str, keyword: str, source_graph) -> str:
     if not candidate_facts:
         return ""
 
-    # Step B & C: Cross-Encoder Scoring & Arbitration
+    # Step D: Cross-Encoder Scoring & Arbitration
     cross_encoder = get_cross_encoder()
     pairs = [[query, fact] for fact in candidate_facts]
     scores = cross_encoder.predict(pairs)
     
-    # Step D: Return the single highest-scoring fact
-    best_idx = scores.argmax()
+    # Tiebreaker: if query contains digits, boost candidates that also contain those digits
+    # only when scores are within 0.05 of each other.
+    import re
+    query_digits = re.findall(r'\d+', keyword)
+    if query_digits:
+        def _digit_score(text: str) -> int:
+            return sum(1 for d in query_digits if d in text)
+        
+        best_idx = max(
+            range(len(candidate_facts)),
+            key=lambda i: (
+                round(scores[i] * 20), # Bucket by 0.05
+                _digit_score(candidate_facts[i]),
+                scores[i]
+            )
+        )
+    else:
+        best_idx = scores.argmax()
+
     return candidate_facts[best_idx]
 
 

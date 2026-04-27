@@ -44,10 +44,9 @@ def _load_spacy_model():
         return spacy.load("en_core_web_sm")
 
 
-def extract_source_triples(text: str) -> list[KnowledgeTriple]:
+def _extract_svo_triples(text: str) -> list[KnowledgeTriple]:
     """
     Open-world SVO extraction using spaCy.
-    Prioritises recall for building the SourceGraph.
     """
     nlp = _load_spacy_model()
     doc = nlp(text)
@@ -60,21 +59,13 @@ def extract_source_triples(text: str) -> list[KnowledgeTriple]:
         obj = _find_object(sent, verb_token)
 
         if subject and verb and obj:
-            # --- TEMPORAL HARVESTING ---
-            # Grab any dates/times in the sentence that the dependency parser missed
-            # Store them as metadata rather than mutating the graph node strings.
             combined_triple_text = f"{subject} {verb} {obj}".lower()
             orphaned_dates = tuple(
                 ent.text.strip() for ent in sent.ents
                 if ent.label_ in {"DATE", "TIME"} and ent.text.lower() not in combined_triple_text
             )
-            # ---------------------------
 
-            # Move leading preposition from object to verb for cleaner nodes
-            # e.g., (apple, born, in Kazakhstan) -> (apple, born in, Kazakhstan)
-            PREPOSITIONS = {
-                "in", "on", "at", "from", "to", "by", "with", "for", "into", "of"
-            }
+            PREPOSITIONS = {"in", "on", "at", "from", "to", "by", "with", "for", "into", "of"}
             obj_parts = obj.split()
             if len(obj_parts) > 1 and obj_parts[0].lower() in PREPOSITIONS:
                 prep = obj_parts[0]
@@ -89,8 +80,38 @@ def extract_source_triples(text: str) -> list[KnowledgeTriple]:
                 extraction_method="spacy",
                 is_deterministic=True
             ))
+    return triples
 
-    return _deduplicate(triples)
+
+def extract_source_triples(text: str) -> list[KnowledgeTriple]:
+    """
+    Open-world SVO extraction using spaCy.
+    """
+    return _extract_svo_triples(text)
+
+
+def extract_numeric_triples(text: str) -> list[KnowledgeTriple]:
+    """
+    Dedicated pass to harvest percentages, dates, and quantities
+    that the SVO parser might miss.
+    """
+    nlp = _load_spacy_model()
+    doc = nlp(text)
+    triples = []
+    
+    for sent in doc.sents:
+        subject = _find_subject(sent) or "Document"
+        numeric_ents = [ent for ent in sent.ents if ent.label_ in {"DATE", "PERCENT", "QUANTITY", "CARDINAL", "MONEY"}]
+        
+        for num_ent in numeric_ents:
+            triples.append(KnowledgeTriple(
+                subject=subject,
+                verb="has value",
+                object=num_ent.text.strip(),
+                extraction_method="spacy_numeric",
+                is_deterministic=True
+            ))
+    return triples
 
 
 def extract_claim_triples(text: str) -> list[KnowledgeTriple]:
